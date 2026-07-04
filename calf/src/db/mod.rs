@@ -1,4 +1,4 @@
-use anyhow::Context;
+use anyhow::{Context, anyhow};
 use rocksdb::{Env, Options, DB};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -84,22 +84,28 @@ impl Db {
 
         Ok(options)
     }
-    pub fn insert<T>(&self, column: Column, key: &str, value: T) -> Result<(), Error>
+    fn lock_db(&self) -> Result<std::sync::MutexGuard<'_, DB>, anyhow::Error> {
+        self.db.lock().map_err(|poisoned| {
+            anyhow!("database mutex poisoned: {}", poisoned)
+        })
+    }
+
+    pub fn insert<T>(&self, column: Column, key: &str, value: T) -> anyhow::Result<()>
     where
         T: Serialize,
     {
         let value = bincode::serialize(&value)?;
-        let db = self.db.lock().unwrap();
+        let db = self.lock_db()?;
         let cf = db.cf_handle(column.as_str()).ok_or(Error::KeyNotFound)?;
         db.put_cf(cf, key.as_bytes(), value)?;
         Ok(())
     }
 
-    pub fn get<T>(&self, column: Column, key: &str) -> Result<Option<T>, Error>
+    pub fn get<T>(&self, column: Column, key: &str) -> anyhow::Result<Option<T>>
     where
         T: for<'de> Deserialize<'de>,
     {
-        let db = self.db.lock().unwrap();
+        let db = self.lock_db()?;
         let cf = db.cf_handle(column.as_str()).ok_or(Error::KeyNotFound)?;
         if let Some(value) = db.get_cf(cf, key.as_bytes())? {
             let deserialized: T = bincode::deserialize(&value)?;
@@ -108,11 +114,11 @@ impl Db {
         Ok(None)
     }
 
-    pub fn remove<T>(&self, column: Column, key: &str) -> Result<Option<T>, Error>
+    pub fn remove<T>(&self, column: Column, key: &str) -> anyhow::Result<Option<T>>
     where
         T: for<'de> Deserialize<'de>,
     {
-        let db = self.db.lock().unwrap();
+        let db = self.lock_db()?;
         let cf = db.cf_handle(column.as_str()).ok_or(Error::KeyNotFound)?;
         if let Some(value) = db.get_cf(cf, key.as_bytes())? {
             let deserialized: T = bincode::deserialize(&value)?;

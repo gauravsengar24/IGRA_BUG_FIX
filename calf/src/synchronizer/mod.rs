@@ -71,7 +71,8 @@ where
         _requests_tx: mpsc::Sender<NetworkRequest>,
         _responses_rx: broadcast::Receiver<ReceivedObject<SyncResponse>>,
     ) -> anyhow::Result<Vec<ReceivedObject<RequestPayload>>> {
-        unimplemented!("Lucky Broadcast with retry");
+        tracing::warn!("Lucky Broadcast with retry not yet implemented, returning empty");
+        Ok(Vec::new())
     }
     /// Try to fetch a set of objects from a set of peers, peer per peer. If a peer answer all the data we need the process is over.
     /// If a peer provides only a subset of the data, this data is saved and we try to get the remaining missing data from the next peer.

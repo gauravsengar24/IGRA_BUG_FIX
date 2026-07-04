@@ -16,7 +16,7 @@
 
 **Auditor:** Kaspa Community Promoter · Independent Security Researcher  
 **Classification:** Confidential  
-**Version:** 2.0
+**Version:** 2.1
 
 </div>
 
@@ -132,6 +132,21 @@ IGRA_BUG_FIX/
 
 ---
 
+### 🛠 Secondary Fixes (Post-Audit Deep Scan, 8 additional)
+
+| # | File | Issue | Fix |
+|---|------|-------|-----|
+| S-01 | `calf/src/network/mod.rs` | Logic bug: unwrap after error check | Early return on serialize failure |
+| S-02 | `calf/src/worker/mod.rs` | Channel send panics on shutdown | Graceful break on `is_err()` |
+| S-03 | `calf/src/db/mod.rs` | 3× poisoned mutex panic | `lock_db()` helper with error handling |
+| S-04 | `kaswallet/common/src/args.rs` | `panic!()` on invalid CLI flags | Return `Result` instead |
+| S-05 | `kaswallet/common/src/encrypted_mnemonic.rs` | Argon2 hash unwrap | `ok_or_else(..)?` error propagation |
+| S-06 | `calf/src/network/primary.rs` | `todo!()` runtime panic | Warning log + graceful fallback |
+| S-07 | `calf/src/network/worker.rs` | `todo!()` runtime panic | Warning log + empty response |
+| S-08 | `calf/src/synchronizer/mod.rs` | `unimplemented!()` runtime panic | Warning log + empty result |
+
+---
+
 ## Severity Distribution
 
 ```
@@ -161,7 +176,8 @@ Count
 | Error Handling | 14 | 64 | 12 |
 | Logging/Sensitive Data | 3 | 6 | 3 |
 | Memory Management | 1 | 8 | 0 |
-| **Total** | **35** | **213** | **29** |
+| Secondary Fixes (Deep Scan) | 7 | 68 | 12 |
+| **Total** | **42** | **281** | **41** |
 
 ---
 

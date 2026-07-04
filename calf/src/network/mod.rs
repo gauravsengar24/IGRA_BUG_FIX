@@ -119,12 +119,14 @@ where
     ) -> tokio::task::JoinHandle<()> {
         let token_clone = cancellation_token.clone();
         tokio::spawn(async move {
-            let identify_infos = serde_json::to_string(&peers.read().await.identify());
-            if identify_infos.is_err() {
-                token_clone.cancel();
-            }
-            //safe unwrap, checked --^
-            let identify_infos = identify_infos.unwrap();
+            let identify_infos = match serde_json::to_string(&peers.read().await.identify()) {
+                Ok(infos) => infos,
+                Err(e) => {
+                    tracing::error!("failed to serialize identify infos: {e}");
+                    token_clone.cancel();
+                    return;
+                }
+            };
             let keypair_lib = Keypair::from(keypair.clone());
             let mdns = match mdns::tokio::Behaviour::new(
                 mdns::Config::default(),

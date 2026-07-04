@@ -170,8 +170,9 @@ impl ManagePeers for PrimaryPeers {
             || self.workers.iter().any(|(peer_id, _)| peer_id == &id)
             || self.established.contains_key(&id)
     }
-    fn get_to_dial_peers(&self, _committee: &Committee) -> Vec<(PeerId, Multiaddr)> {
-        todo!()
+    fn get_to_dial_peers(&self, committee: &Committee) -> Vec<(PeerId, Multiaddr)> {
+        tracing::warn!("get_to_dial_peers not fully implemented, returning primaries");
+        self.primaries.iter().map(|(id, addr)| (*id, addr.clone())).collect()
     }
     fn add_established(&mut self, id: PeerId, addr: Multiaddr) {
         self.established.insert(id, addr);

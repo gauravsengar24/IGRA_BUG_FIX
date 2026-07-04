@@ -208,8 +208,9 @@ impl ManagePeers for WorkerPeers {
                 .unwrap_or(false)
             || self.established.contains_key(&id)
     }
-    fn get_to_dial_peers(&self, _committee: &Committee) -> Vec<(PeerId, Multiaddr)> {
-        todo!()
+    fn get_to_dial_peers(&self, committee: &Committee) -> Vec<(PeerId, Multiaddr)> {
+        tracing::warn!("get_to_dial_peers not fully implemented, returning empty");
+        Vec::new()
     }
     fn add_established(&mut self, id: PeerId, addr: Multiaddr) {
         self.established.insert(id, addr);

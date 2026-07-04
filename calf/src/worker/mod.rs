@@ -245,7 +245,10 @@ fn tx_producer_task(
     tokio::spawn(async move {
         loop {
             let tx = Transaction::random(size);
-            txs_tx.send(tx).await.unwrap();
+            if txs_tx.send(tx).await.is_err() {
+                tracing::warn!("tx producer: receiver dropped, stopping");
+                break;
+            }
             tokio::time::sleep(tokio::time::Duration::from_millis(delay)).await;
         }
     })

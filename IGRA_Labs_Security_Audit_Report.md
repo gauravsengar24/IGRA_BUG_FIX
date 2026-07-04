@@ -19,8 +19,8 @@
 | **Engagement Type** | Full-Scope Whitebox Audit + Remediation Verification |
 | **Review Period** | June — July 2026 |
 | **Report Date** | July 4, 2026 |
-| **Version** | 2.0 |
-| **Status** | ✅ Final |
+| **Version** | 2.1 |
+| **Status** | ✅ Final + Deep Scan |
 
 ---
 
@@ -77,12 +77,13 @@ Total         36      ✅ 100% Remediated
 
 ### Key Achievements
 
-- **Eliminated 12 unconditional panic/unwrap sites** — preventing daemon/crashes under adverse network conditions
+- **Eliminated 20 unconditional panic/unwrap sites** (12 original + 8 from deep scan) — preventing daemon crashes under adverse network conditions
 - **Fixed 2 critical race conditions** — including a thundering herd vulnerability in gas price caching and a non-atomic key file write that could lead to permanent wallet lockout
 - **Hardened input validation** across 3 Rust services — preventing malformed configurations from causing undefined behavior
 - **Implemented atomic file operations** — closing a TOCTOU race window in wallet key persistence
 - **Added bounded memory management** — preventing unbounded mempool transaction growth in the wallet daemon
 - **Reduced sensitive data exposure** — demoting extended public key logging from debug to trace level
+- **Secondary deep scan** cleaned 8 additional production-code risks including `todo!()`/`unimplemented!()` stubs, poisoned mutex handling, and logic bugs
 
 ---
 

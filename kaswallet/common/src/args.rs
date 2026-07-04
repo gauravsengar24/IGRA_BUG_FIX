@@ -8,19 +8,19 @@ pub fn parse_network_type(
     simnet: bool,
     testnet_suffix: u32,
     enable_mainnet_pre_launch: bool,
-) -> NetworkId {
+) -> Result<NetworkId, String> {
     match (testnet, devnet, simnet) {
         (false, false, false) => {
             if enable_mainnet_pre_launch {
-                NetworkId::new(NetworkType::Mainnet)
+                Ok(NetworkId::new(NetworkType::Mainnet))
             } else {
-                panic!("mainnet is not yet enabled, use --testnet, --devnet, or --simnet")
+                Err("mainnet is not yet enabled, use --testnet, --devnet, or --simnet".to_string())
             }
         }
-        (true, false, false) => NetworkId::with_suffix(NetworkType::Testnet, testnet_suffix),
-        (false, true, false) => NetworkId::new(NetworkType::Devnet),
-        (false, false, true) => NetworkId::new(NetworkType::Simnet),
-        _ => panic!("only a single net should be activated"),
+        (true, false, false) => Ok(NetworkId::with_suffix(NetworkType::Testnet, testnet_suffix)),
+        (false, true, false) => Ok(NetworkId::new(NetworkType::Devnet)),
+        (false, false, true) => Ok(NetworkId::new(NetworkType::Simnet)),
+        _ => Err("only a single net should be activated".to_string()),
     }
 }
 

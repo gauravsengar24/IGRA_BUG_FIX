@@ -33,5 +33,6 @@ impl Args {
             self.testnet_suffix,
             self.enable_mainnet_pre_launch,
         )
+        .expect("invalid network configuration; use --testnet, --devnet, or --simnet")
     }
 }

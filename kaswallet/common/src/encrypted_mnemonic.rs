@@ -45,7 +45,10 @@ impl EncryptedMnemonic {
                 reason: e.to_string(),
                 location: ErrorLocation::capture(),
             })?;
-        let hash = password_hash.hash.unwrap();
+        let hash = password_hash.hash.ok_or_else(|| CryptoError::KeyFileCorrupt {
+            reason: "argon2 password hash missing in decrypt".to_string(),
+            location: ErrorLocation::capture(),
+        })?;
         let key_bytes = hash.as_bytes();
         let key = Key::<XChaCha20Poly1305>::from_slice(key_bytes);
         let mut cipher = XChaCha20Poly1305::new(key);
@@ -94,7 +97,10 @@ impl EncryptedMnemonic {
                 reason: e.to_string(),
                 location: ErrorLocation::capture(),
             })?;
-        let hash = password_hash.hash.unwrap();
+        let hash = password_hash.hash.ok_or_else(|| CryptoError::EncryptionFailed {
+            reason: "argon2 password hash missing in encrypt".to_string(),
+            location: ErrorLocation::capture(),
+        })?;
         let key_bytes = hash.as_bytes();
         let key = Key::<XChaCha20Poly1305>::from_slice(key_bytes);
         let mut cipher = XChaCha20Poly1305::new(key);
