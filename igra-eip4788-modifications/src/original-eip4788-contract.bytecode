@@ -1,0 +1,72 @@
+###############################################################################
+# The bytecode for the (original) EIP-4788 Beacon Root History smart contract.
+# For detailed bytecode analysis, see: ../docs/original-eip4788-contract.md
+###############################################################################
+
+caller
+push20 0xfffffffffffffffffffffffffffffffffffffffe
+eq
+push1 0x4d
+jumpi
+
+push1 0x20
+calldatasize
+eq
+push1 0x24
+jumpi
+
+push0
+push0
+revert
+
+jumpdest
+push0
+calldataload
+dup1
+iszero
+push1 0x49
+jumpi
+
+push3 0x001fff
+dup2
+mod
+swap1
+dup2
+sload
+eq
+push1 0x3c
+jumpi
+
+push0
+push0
+revert
+
+jumpdest
+push3 0x001fff
+add
+sload
+push0
+mstore
+push1 0x20
+push0
+return
+
+jumpdest
+push0
+push0
+revert
+
+jumpdest
+push3 0x001fff
+timestamp
+mod
+timestamp
+dup2
+sstore
+push0
+calldataload
+swap1
+push3 0x001fff
+add
+sstore
+stop

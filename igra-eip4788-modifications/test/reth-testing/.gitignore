@@ -1,0 +1,15 @@
+# Node.js
+node_modules/
+package-lock.json
+
+# Hardhat
+artifacts/
+cache/
+coverage/
+coverage.json
+
+# Docker
+reth-data/
+reth-source-data/
+reth-test-data/
+

@@ -1,0 +1,49 @@
+{
+  "config": {
+    "chainId": 1337,
+    "homesteadBlock": 0,
+    "eip150Block": 0,
+    "eip155Block": 0,
+    "eip158Block": 0,
+    "byzantiumBlock": 0,
+    "constantinopleBlock": 0,
+    "petersburgBlock": 0,
+    "istanbulBlock": 0,
+    "berlinBlock": 0,
+    "londonBlock": 0,
+    "arrowGlacierBlock": 0,
+    "grayGlacierBlock": 0,
+    "mergeNetsplitBlock": 0,
+    "shanghaiTime": 0,
+    "cancunTime": 0,
+    "pragueTime": 0,
+    "terminalTotalDifficulty": "0x0",
+    "terminalTotalDifficultyPassed": true,
+    "ethash": {}
+  },
+  "alloc": {
+    "0x000F3df6D732807Ef1319fB7B8bB8522d0Beac02": {
+      "balance": "0x0",
+      "code": "0x3373fffffffffffffffffffffffffffffffffffffffe14607d57602036146024575f5ffd5b5f358015607957611fff810690815414603b575f5ffd5b611fff0180545f523373fe38d0727b928e19be51673ac0691ca22c05b1b3146063575060205ff35b611fff018054602052611fff015460405260605ff35b5f5ffd5b611fff4206428155611fff015f358155611fff01448155611fff0143905500"
+    },
+    "0xFe38D0727B928E19bE51673Ac0691Ca22C05B1B3": {
+      "code": "0x365f5f375f5f365f73000f3df6d732807ef1319fb7b8bb8522d0beac025afa3d5f5f3e15602a573d5ff35b3d5ffd",
+      "balance": "0x0"
+    },
+    "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266": {
+      "balance": "0x20000000000000000000000000000000000000000"
+    }
+  },
+  "difficulty": "0x0",
+  "gasLimit": "0x1c9c380",
+  "extraData": "0x",
+  "gasUsed": "0x0",
+  "number": "0x0",
+  "timestamp": "0x0",
+  "nonce": "0x0000000000000000000000000000000000000000",
+  "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "parentBeaconBlockRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "baseFeePerGas": "0x3b9aca00",
+  "prevRandao": "0x0000000000000000000000000000000000000000000000000000000000000000"
+}

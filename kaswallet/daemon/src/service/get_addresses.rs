@@ -1,0 +1,30 @@
+use crate::service::kaswallet_service::KasWalletService;
+use common::errors::WalletResult;
+use common::model::{Keychain, WalletAddress};
+use proto::kaswallet_proto::GetAddressesRequest;
+use std::sync::atomic::Ordering::Relaxed;
+
+impl KasWalletService {
+    pub(crate) async fn get_addresses(
+        &self,
+        _request: GetAddressesRequest,
+    ) -> WalletResult<Vec<String>> {
+        self.check_is_synced().await?;
+
+        let mut addresses = vec![];
+        let address_manager = self.address_manager.lock().await;
+        for i in 1..=self.keys.last_used_external_index.load(Relaxed) {
+            let wallet_address = WalletAddress {
+                index: i,
+                cosigner_index: self.keys.cosigner_index,
+                keychain: Keychain::External,
+            };
+            let address = address_manager
+                .kaspa_address_from_wallet_address(&wallet_address, true)
+                .await?;
+            addresses.push(address.to_string());
+        }
+
+        Ok(addresses)
+    }
+}

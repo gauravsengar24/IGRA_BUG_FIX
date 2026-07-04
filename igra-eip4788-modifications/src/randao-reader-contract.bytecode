@@ -1,0 +1,30 @@
+###############################################################################
+# The bytecode for the Randao Reader smart contract.
+# For detailed bytecode analysis, see: ../docs/randao-reader-contract.md
+###############################################################################
+
+calldatasize
+push0
+push0
+calldatacopy
+push0
+push0
+calldatasize
+push0
+push20 0x000F3df6D732807Ef1319fB7B8bB8522d0Beac02
+gas
+staticcall
+returndatasize
+push0
+push0
+returndatacopy
+iszero
+push1 0x2a
+jumpi
+returndatasize
+push0
+return
+jumpdest
+returndatasize
+push0
+revert

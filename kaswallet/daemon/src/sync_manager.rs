@@ -1,0 +1,309 @@
+use crate::address_manager::{AddressManager, AddressSet};
+use crate::utxo_manager::UtxoManager;
+use common::error_location::ErrorLocation;
+use common::errors::{RpcError, SyncError, WalletResult};
+use common::keys::Keys;
+use kaspa_addresses::Address;
+use kaspa_grpc_client::GrpcClient;
+use kaspa_wallet_core::rpc::RpcApi;
+use std::cmp::max;
+use std::sync::Arc;
+use std::sync::atomic::Ordering::Relaxed;
+use std::sync::atomic::{AtomicBool, AtomicU32};
+use tokio::sync::Mutex;
+use tokio::task::JoinHandle;
+use tokio::time::interval;
+use tracing::{debug, info};
+
+const NUM_INDEXES_TO_QUERY_FOR_FAR_ADDRESSES: u32 = 100;
+const NUM_INDEXES_TO_QUERY_FOR_RECENT_ADDRESSES: u32 = 1000;
+
+pub struct SyncManager {
+    kaspa_client: Arc<GrpcClient>,
+    keys_file: Arc<Keys>,
+    address_manager: Arc<Mutex<AddressManager>>,
+    utxo_manager: Arc<Mutex<UtxoManager>>,
+
+    sync_interval_millis: u64,
+    first_sync_done: AtomicBool,
+    next_sync_start_index: AtomicU32,
+    is_log_final_progress_line_shown: AtomicBool,
+    max_used_addresses_for_log: AtomicU32,
+    max_processed_addresses_for_log: AtomicU32,
+}
+
+impl SyncManager {
+    pub fn new(
+        kaspa_rpc_client: Arc<GrpcClient>,
+        keys_file: Arc<Keys>,
+        address_manager: Arc<Mutex<AddressManager>>,
+        utxo_manager: Arc<Mutex<UtxoManager>>,
+        sync_interval: u64,
+    ) -> Self {
+        Self {
+            kaspa_client: kaspa_rpc_client,
+            keys_file,
+            address_manager,
+            utxo_manager,
+            sync_interval_millis: sync_interval,
+            first_sync_done: AtomicBool::new(false),
+            next_sync_start_index: 0.into(),
+            is_log_final_progress_line_shown: false.into(),
+            max_used_addresses_for_log: 0.into(),
+            max_processed_addresses_for_log: 0.into(),
+        }
+    }
+
+    pub async fn is_synced(&self) -> bool {
+        self.next_sync_start_index.load(Relaxed) > self.last_used_index().await
+            && self.first_sync_done.load(Relaxed)
+    }
+
+    async fn last_used_index(&self) -> u32 {
+        let last_used_external_index = self.keys_file.last_used_external_index.load(Relaxed);
+        let last_used_internal_index = self.keys_file.last_used_internal_index.load(Relaxed);
+
+        max(last_used_external_index, last_used_internal_index)
+    }
+
+    pub fn start(sync_manager: Arc<SyncManager>) -> JoinHandle<()> {
+        tokio::spawn(async move {
+            if let Err(e) = sync_manager.sync_loop().await {
+                error!("Fatal error in sync loop: {}", e);
+                return Err(e);
+            }
+        })
+    }
+
+    async fn sync_loop(&self) -> WalletResult<()> {
+        {
+            info!("Starting sync loop");
+            self.collect_recent_addresses().await?;
+            self.refresh_utxos().await?;
+            self.first_sync_done.store(true, Relaxed);
+            info!("Finished initial sync");
+        }
+
+        let mut interval = interval(core::time::Duration::from_millis(self.sync_interval_millis));
+        loop {
+            interval.tick().await;
+
+            {
+                self.sync().await?;
+            }
+        }
+    }
+
+    async fn refresh_utxos(&self) -> WalletResult<()> {
+        debug!("Refreshing UTXOs...");
+        let address_strings: Vec<String>;
+        {
+            let address_manager = self.address_manager.lock().await;
+            address_strings = address_manager.address_strings().await?;
+        }
+        let addresses: Vec<Address> = address_strings
+            .iter()
+            .map(|address_string| Address::constructor(address_string))
+            .collect();
+
+        // Lock utxo_manager at this stage, so that nobody tries to generate transactions while
+        // we update the utxo set
+        let mut utxo_manager = self.utxo_manager.lock().await;
+
+        debug!("Getting mempool entries for addresses: {:?}...", addresses);
+        let addresses_count = addresses.len();
+        let mempool_entries_by_addresses = self
+            .kaspa_client
+            .get_mempool_entries_by_addresses(addresses.clone(), true, true)
+            .await
+            .map_err(|e| SyncError::UtxoFetchFailed {
+                addresses_count,
+                source: Box::new(RpcError::Transport {
+                    reason: e.to_string(),
+                    location: ErrorLocation::capture(),
+                }),
+                location: ErrorLocation::capture(),
+            })?;
+        debug!(
+            "Got {} mempool sending entries and {} receiving entries",
+            mempool_entries_by_addresses
+                .iter()
+                .map(|me| me.sending.len())
+                .sum::<usize>(),
+            mempool_entries_by_addresses
+                .iter()
+                .map(|me| me.receiving.len())
+                .sum::<usize>()
+        );
+
+        debug!("Getting UTXOs by addresses...");
+        let get_utxo_by_addresses_response = self
+            .kaspa_client
+            .get_utxos_by_addresses(addresses)
+            .await
+            .map_err(|e| SyncError::UtxoFetchFailed {
+                addresses_count,
+                source: Box::new(RpcError::Transport {
+                    reason: e.to_string(),
+                    location: ErrorLocation::capture(),
+                }),
+                location: ErrorLocation::capture(),
+            })?;
+        debug!("Got {} utxo entries", get_utxo_by_addresses_response.len());
+
+        utxo_manager
+            .update_utxo_set(get_utxo_by_addresses_response, mempool_entries_by_addresses)
+            .await?;
+
+        // Surface a per-sync summary of what we now hold, split by
+        // confirmed vs. mempool-receiving. The two counts let an operator
+        // tell at a glance whether the wallet is sourcing inputs from
+        // kaspad's consensus UTXO set or from ephemeral mempool outputs
+        // (only the former survive a reorg → orphan).
+        let snapshot = utxo_manager.utxos_by_outpoint();
+        let confirmed = snapshot
+            .values()
+            .filter(|u| !u.utxo_entry.is_unconfirmed)
+            .count();
+        let unconfirmed = snapshot.len().saturating_sub(confirmed);
+        info!(
+            confirmed,
+            unconfirmed,
+            total = snapshot.len(),
+            "utxo set refreshed"
+        );
+
+        Ok(())
+    }
+
+    async fn sync(&self) -> WalletResult<()> {
+        debug!("Starting sync cycle");
+        {
+            self.collect_far_addresses().await?;
+            self.collect_recent_addresses().await?;
+        }
+        self.refresh_utxos().await?;
+
+        debug!("Sync cycle completed successfully");
+
+        Ok(())
+    }
+
+    pub async fn collect_recent_addresses(&self) -> WalletResult<()> {
+        debug!("Collecting recent addresses");
+
+        let mut index: u32 = 0;
+        let mut max_used_index: u32 = 0;
+
+        while index < max_used_index + NUM_INDEXES_TO_QUERY_FOR_RECENT_ADDRESSES {
+            self.collect_addresses(index, index + NUM_INDEXES_TO_QUERY_FOR_RECENT_ADDRESSES)
+                .await?;
+            index += NUM_INDEXES_TO_QUERY_FOR_RECENT_ADDRESSES;
+
+            max_used_index = self.last_used_index().await;
+
+            self.update_address_collection_progress_log(index, max_used_index);
+        }
+
+        let next_sync_start_index = self.next_sync_start_index.load(Relaxed);
+        if index > next_sync_start_index {
+            self.next_sync_start_index.store(index, Relaxed);
+        }
+        Ok(())
+    }
+
+    pub async fn collect_far_addresses(&self) -> WalletResult<()> {
+        debug!("Collecting far addresses");
+
+        let next_sync_start_index = self.next_sync_start_index.load(Relaxed);
+
+        self.collect_addresses(
+            next_sync_start_index,
+            next_sync_start_index + NUM_INDEXES_TO_QUERY_FOR_FAR_ADDRESSES,
+        )
+        .await?;
+
+        self.next_sync_start_index
+            .fetch_add(NUM_INDEXES_TO_QUERY_FOR_FAR_ADDRESSES, Relaxed);
+
+        Ok(())
+    }
+
+    async fn collect_addresses(&self, start: u32, end: u32) -> WalletResult<()> {
+        debug!("Collecting addresses from {} to {}", start, end);
+
+        let addresses: AddressSet;
+        {
+            let address_manager = self.address_manager.lock().await;
+            addresses = address_manager.addresses_to_query(start, end).await?;
+        }
+        debug!("Querying {} addresses", addresses.len());
+
+        let addresses_count = addresses.len();
+        let get_balances_by_addresses_response = self
+            .kaspa_client
+            .get_balances_by_addresses(
+                addresses
+                    .keys()
+                    .map(|address_string| Address::constructor(address_string))
+                    .collect(),
+            )
+            .await
+            .map_err(|e| SyncError::UtxoFetchFailed {
+                addresses_count,
+                source: Box::new(RpcError::Transport {
+                    reason: e.to_string(),
+                    location: ErrorLocation::capture(),
+                }),
+                location: ErrorLocation::capture(),
+            })?;
+
+        let address_manager = self.address_manager.lock().await;
+        address_manager
+            .update_addresses_and_last_used_indexes(addresses, get_balances_by_addresses_response)
+            .await?;
+
+        Ok(())
+    }
+
+    pub fn update_address_collection_progress_log(
+        &self,
+        processed_addresses: u32,
+        max_used_addresses: u32,
+    ) {
+        if max_used_addresses > self.max_used_addresses_for_log.load(Relaxed) {
+            self.max_used_addresses_for_log
+                .store(max_used_addresses, Relaxed);
+            if self.is_log_final_progress_line_shown.load(Relaxed) {
+                info!("An additional set of previously used addresses found, processing...");
+                self.max_processed_addresses_for_log.store(0, Relaxed);
+                self.is_log_final_progress_line_shown.store(false, Relaxed);
+            }
+        }
+
+        if processed_addresses > self.max_processed_addresses_for_log.load(Relaxed) {
+            self.max_processed_addresses_for_log
+                .store(processed_addresses, Relaxed)
+        }
+
+        if self.max_processed_addresses_for_log.load(Relaxed)
+            >= self.max_used_addresses_for_log.load(Relaxed)
+        {
+            if !self.is_log_final_progress_line_shown.load(Relaxed) {
+                info!("Finished scanning recent addresses");
+                self.is_log_final_progress_line_shown.store(true, Relaxed);
+            }
+        } else {
+            let percent_processed = self.max_processed_addresses_for_log.load(Relaxed) as f64
+                / self.max_used_addresses_for_log.load(Relaxed) as f64
+                * 100.0;
+
+            info!(
+                "{} addressed of {} of processed ({:.2}%)",
+                self.max_processed_addresses_for_log.load(Relaxed),
+                self.max_used_addresses_for_log.load(Relaxed),
+                percent_processed
+            );
+        }
+    }
+}

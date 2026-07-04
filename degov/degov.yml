@@ -1,0 +1,110 @@
+name: IGRA Governance
+code: igra-governance
+logo: /igra-logo-avatar.png
+siteUrl: https://governance.igralabs.com
+offChainDiscussionUrl: https://discord.gg/igralabs
+editLink: https://github.com/IgraLabs/degov/blob/igra/fix-docker-file/degov.yml
+description: |
+  Governance for Igra Network, an EVM-compatible programmability layer on top of Kaspa BlockDAG.
+# The following fields in the links are optional and will be used to display basic information about the DAO
+links:
+  website: https://igralabs.com
+  twitter: https://x.com/igra_labs
+  discord: https://discord.gg/igralabs
+  github: https://github.com/igralabs
+
+# The custom theme configuration for the DAO, this is optional.
+theme:
+  logoDark: /igra-logo-dark.svg
+  logoLight: /igra-logo-dark.svg
+  banner: https://raw.githubusercontent.com/ringecosystem/degov-registry/refs/heads/main/assets/banners/demo.jpg
+  bannerMobile: https://raw.githubusercontent.com/ringecosystem/degov-registry/refs/heads/main/assets/banners/demo-mobile.jpg
+  # The general faqs displayed on the dashboard, at most 5 items
+  faqs:
+    - question: What is Igra DAO?
+      answer: https://igra-labs.gitbook.io/igralabs-docs/igra-dao
+    - question: What can the DAO control?
+      answer: https://igra-labs.gitbook.io/igralabs-docs/igra-dao
+    - question: How do proposals work?
+      answer: https://igra-labs.gitbook.io/igralabs-docs/igra-dao
+    - question: What is immutable?
+      answer: https://igra-labs.gitbook.io/igralabs-docs/igra-dao
+    - question: Can the protocol be paused?
+      answer: https://igra-labs.gitbook.io/igralabs-docs/igra-dao
+
+# Wallet connection related configuration
+wallet:
+  walletConnectProjectId: d5dae553538344c06d270be754404e5f
+
+# Chain information: these commented fields are optional if this chain can be accessed by viem.
+chain:
+  id: 38833
+  name: Igra Network
+  logo: https://pbs.twimg.com/profile_images/1912415584257474560/GznnScP3_400x400.jpg
+  rpcs:
+    - https://rpc.igralabs.com:8545
+  explorers:
+    - https://explorer.igralabs.com
+  nativeToken:
+    symbol: iKAS
+    decimals: 18
+    priceId: kaspa
+    logo: https://assets.coingecko.com/coins/images/25751/standard/kaspa-icon-exchanges.png?1696524837
+
+# Indexer related configuration
+indexer:
+  endpoint: https://governance.igralabs.com/graphql
+  startBlock: 1260
+
+  ## https://docs.sqd.ai/sdk/reference/processors/evm-batch/general/#set-finality-confirmation
+  #finalityConfirmation: 50
+  ## https://docs.sqd.ai/sdk/reference/processors/substrate-batch/general/#set-rpc-endpoint
+  #capacity: 30
+  ## https://docs.sqd.ai/sdk/reference/processors/substrate-batch/general/#set-rpc-endpoint
+  #maxBatchCallSize: 200
+  ## https://docs.sqd.ai/subsquid-network/reference/networks/#evm--ethereum-compatible
+  #gateway:
+
+# Core contracts related to the DAO Governance
+contracts:
+  governor: "0xB3300fcC2F3EF3DeCdF8B1f710c21666f33Cbf18"
+  governorToken:
+    address: "0x50BAc71D1B32Fa6030007b5E72dbBB4fF48c1B39"
+    standard: IgraVotingPower
+  timeLock: "0xB3300fcC2F3EF3DeCdF8B1f710c21666f33Cbf18"
+  igraToken: "0x093d77d397F8acCbaee0820345E9E700B1233cD1"
+  attestation: "0xc24Df70E408739aeF6bF594fd41db4632dF49188"
+
+# The treasury assets information
+treasuryAssets: []
+#  - name: FT
+#    contract: "0x3ff4F23F328664FfD046eb4ca62be3d8aF3e452f"
+#    standard: ERC20
+#    priceId: FT
+#  - name: NFT
+#    contract: "0xA785c85dADa2dFF129b3eba7523bD380eA8b4e2A"
+#    standard: ERC721
+#    priceId: NFT
+
+# The DAO Safe information
+safes: []
+#  - name: Test DAO Safe(Arbitrum)
+#    chainId: 42161
+#    link: https://app.safe.global/home?safe=arb1:0x80d180621B2f875269216f19A499e6fB9402776C
+#  - name: Test DAO Safe(Sepolia)
+#    chainId: 11155111
+#    link: https://app.safe.global/home?safe=sep:0x80d180621B2f875269216f19A499e6fB9402776C
+
+# The applications shortcuts related to the DAO
+apps: []
+#  - name: Token Wrap
+#    description: Convert back and forth between the native token and the wrapped governance token
+#    icon: https://pbs.twimg.com/profile_images/1912415584257474560/GznnScP3_400x400.jpg
+#    link: https://token-wrap.degov.ai?config=https://degov-dev.vercel.app/degov.yml
+#    params:
+#      sourceToken:
+#        address: "0x48C817eebE1fD79F946bd6b976EF579540517121"
+#        icon: https://assets.coingecko.com/coins/images/9443/standard/RING.png
+#      wrapToken:
+#        address: "0x0ef0827A9d5D329DFbaA14c7d5Aae364453A4D32"
+#        icon: https://assets.coingecko.com/coins/images/9443/standard/RING.png

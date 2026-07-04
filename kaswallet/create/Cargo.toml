@@ -1,0 +1,24 @@
+[package]
+name = "kaswallet-create"
+rust-version.workspace = true
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+include.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "kaswallet-create"
+path = "src/main.rs"
+
+[dependencies]
+kaswallet-common.workspace = true
+
+kaspa-consensus-core.workspace = true
+kaspa-bip32.workspace = true
+
+clap.workspace = true
+rpassword.workspace = true
+constant_time_eq.workspace = true
+secrecy.workspace = true

@@ -1,0 +1,15 @@
+services:
+  proxyExt:
+    image: nginx
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    ports:
+      - "80:80" # Expose nginx to all interfaces of the host
+      - "9091:9091"
+      - "9092:9092"
+    networks:
+      - ext_net
+
+networks:
+  ext_net:
+    external: true

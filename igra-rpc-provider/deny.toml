@@ -1,0 +1,116 @@
+# https://embarkstudios.github.io/cargo-deny/index.html
+
+[graph]
+targets = [
+    { triple = "x86_64-unknown-linux-gnu" },
+    { triple = "aarch64-unknown-linux-gnu" },
+    { triple = "x86_64-unknown-linux-musl" },
+    { triple = "aarch64-apple-darwin" },
+    { triple = "x86_64-apple-darwin" },
+    { triple = "x86_64-pc-windows-msvc" },
+    { triple = "wasm32-unknown-unknown" },
+    { triple = "wasm32-wasi" },
+    { triple = "aarch64-linux-android" },
+    { triple = "aarch64-apple-ios" },
+]
+all-features = true
+no-default-features = false
+
+[output]
+feature-depth = 1
+
+[advisories]
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+ignore = [
+    "RUSTSEC-2024-0384", # instant is unmaintained
+    "RUSTSEC-2021-0145", # atty potential unaligned read (Windows only, not critical for our use case)
+    "RUSTSEC-2024-0375", # atty unmaintained (indirect dependency, will be phased out)
+    "RUSTSEC-2024-0388", # derivative unmaintained (indirect dependency from kaspa crates)
+    "RUSTSEC-2024-0407", # linkme unsound (should upgrade when possible)
+    "RUSTSEC-2024-0370", # proc-macro-error unmaintained (indirect dependency)
+    "RUSTSEC-2026-0173", # proc-macro-error2 unmaintained (transitive via alloy, no safe upgrade available)
+    "RUSTSEC-2024-0436", # paste is unmaintained (project archived, but widely used and stable)
+    "RUSTSEC-2025-0052", # async-std is discontinued (indirect dependency from kaspa crates)
+    "RUSTSEC-2025-0134", # rustls-pemfile unmaintained (indirect dependency from tonic)
+    "RUSTSEC-2025-0141", # bincode unmaintained (indirect dependency from kaspa crates)
+]
+yanked = "warn"
+
+
+[licenses]
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-3-Clause",
+    "BSD-2-Clause",
+    "0BSD",
+    "CC-BY-1.0",
+    "CC-BY-2.0",
+    "CC-BY-3.0",
+    "CC-BY-4.0",
+    "ISC",
+    "OpenSSL",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "Zlib",
+    "Unlicense",
+    "MPL-2.0",
+    "CC0-1.0",
+    "LGPL-3.0", # Allow LGPL for malachite crates (math library dependencies)
+    "LGPL-3.0-only", # Explicit LGPL-3.0-only identifier for malachite crates
+    "CDLA-Permissive-2.0", # Community Data License Agreement - needed for webpki-roots
+    "BSL-1.0", # Boost Software License 1.0 - OSI approved, needed for xxhash-rust via kaspa-wallet-core
+]
+confidence-threshold = 0.8
+unused-allowed-license = "allow"
+
+[licenses.private]
+ignore = false
+registries = []
+
+[[licenses.clarify]]
+name = "ring"
+version = "0.16.20"
+expression = "OpenSSL"
+license-files = [
+    { path = "LICENSE", hash = 0xbd0eed23 }
+]
+
+# Allow LGPL license specifically for malachite math libraries
+[[licenses.clarify]]
+name = "malachite-base"
+expression = "LGPL-3.0-only"
+license-files = []
+
+[[licenses.clarify]]
+name = "malachite-nz"
+expression = "LGPL-3.0-only"
+license-files = []
+
+[bans]
+allow-wildcard-paths = true
+multiple-versions = "warn"
+wildcards = "warn"
+highlight = "all"
+
+[bans.workspace-dependencies]
+duplicates = 'deny'
+unused = 'deny'
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-git = [
+    "ssh://git@github.com/IgraLabs/kaswallet.git",
+    "https://github.com/IgraLabs/rusty-kaspa.git",
+    # Toccata-aware rusty-kaspa (kaspanet upstream branch `toccata`). Used
+    # by both this RPC provider and the kaswallet daemon while the IgraLabs
+    # fork catches up.
+    "https://github.com/kaspanet/rusty-kaspa.git",
+]
+
+[sources.allow-org]
+github = []
+gitlab = []
+bitbucket = []

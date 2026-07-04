@@ -1,0 +1,34 @@
+services:
+  app1_extSrv:
+    extends:
+      file: ./app1/docker-compose.yml
+      service: extSrv
+
+  app1_intSrv:
+    extends:
+      file: ./app1/docker-compose.yml
+      service: intSrv
+
+  app2_extSrv:
+    extends:
+      file: ./app2/docker-compose.yml
+      service: extSrv
+
+  app2_intSrv:
+    extends:
+      file: ./app2/docker-compose.yml
+      service: intSrv
+
+  proxy:
+    extends:
+      file: ./proxy/docker-compose.yml
+      service: proxyExt
+    depends_on:
+      - app1_extSrv
+      - app2_extSrv
+
+networks:
+  ext_net:
+    name: ext_net
+  int_net:
+    name: int_net

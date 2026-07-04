@@ -1,0 +1,104 @@
+###############################################################################
+# The bytecode for the modified EIP-4788 Beacon Root History smart contract.
+# For detailed bytecode analysis, see: ../docs/modified-eip4788-contract.md
+###############################################################################
+
+caller
+push20 0xfffffffffffffffffffffffffffffffffffffffe
+eq
+push1 0x7d
+jumpi
+
+push1 0x20
+calldatasize
+eq
+push1 0x24
+jumpi
+
+push0
+push0
+revert
+
+jumpdest
+push0
+calldataload
+dup1
+iszero
+push1 0x79
+jumpi
+
+push2 0x1fff
+dup2
+mod
+swap1
+dup2
+sload
+eq
+push1 0x3b
+jumpi
+push0
+push0
+revert
+
+jumpdest
+push2 0x1fff
+add
+dup1
+sload
+push0
+mstore
+caller
+push20 0xFe38D0727B928E19bE51673Ac0691Ca22C05B1B3
+eq
+push1 0x63
+jumpi
+
+pop
+push1 0x20
+push0
+return
+
+jumpdest
+push2 0x1fff
+add
+dup1
+sload
+push1 0x20
+mstore
+push2 0x1fff
+add
+sload
+push1 0x40
+mstore
+push1 0x60
+push0
+return
+
+jumpdest
+push0
+push0
+revert
+jumpdest
+push2 0x1fff
+timestamp
+mod
+timestamp
+dup2
+sstore
+push2 0x1fff
+add
+push0
+calldataload
+dup2
+sstore
+push2 0x1fff
+add
+randao
+dup2
+sstore
+push2 0x1fff
+add
+number
+swap1
+sstore
+stop

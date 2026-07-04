@@ -1,0 +1,33 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgres"
+}
+
+model d_user {
+  id                 String    @id
+  address            String
+  dao_code           String? // todo: make this required and add unique constraint with address
+  power              String?
+  name               String?
+  email              String?
+  twitter            String?
+  github             String?
+  discord            String?
+  telegram           String?
+  medium             String?
+  delegate_statement String?
+  additional         String?
+  last_login_time    DateTime
+  ctime              DateTime  @default(now())
+  utime              DateTime? @updatedAt
+}
+
+model d_avatar {
+  id    String    @id
+  image String
+  ctime DateTime  @default(now())
+  utime DateTime? @updatedAt
+}

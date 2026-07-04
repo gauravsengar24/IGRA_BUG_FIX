@@ -1,0 +1,468 @@
+import { clearToken } from "@/lib/auth/token-manager";
+import { getToken } from "@/lib/auth/token-manager";
+import { degovGraphqlApi } from "@/utils/remote-api";
+
+import { request } from "./client";
+import * as Mutations from "./mutations";
+import * as Queries from "./queries";
+import * as Types from "./types";
+
+import type { ProfileData } from "./types/profile";
+import type { EvmAbiResponse, EvmAbiInput } from "./types/proposals";
+
+const emptyProposalMetrics: Types.ProposalMetricsItem = {
+  memberCount: 0,
+  powerSum: "0",
+  proposalsCount: "0",
+  votesCount: "0",
+  votesWeightAbstainSum: "0",
+  votesWeightAgainstSum: "0",
+  votesWeightForSum: "0",
+  votesWithParamsCount: "0",
+  votesWithoutParamsCount: "0",
+};
+
+export const proposalService = {
+  getAllProposals: async (
+    endpoint: string,
+    options: {
+      limit?: number;
+      offset?: number;
+      orderBy?: string;
+      where?: {
+        proposalId_eq?: string;
+        proposer_eq?: string;
+        voters_every?: {
+          voter_eq?: string;
+          support_eq?: number;
+        };
+      };
+    } = {}
+  ) => {
+    const response = await request<Types.ProposalResponse>(
+      endpoint,
+      Queries.GET_ALL_PROPOSALS,
+      options
+    );
+    return response?.proposals ?? [];
+  },
+  getProposalsList: async (
+    endpoint: string,
+    options: {
+      limit?: number;
+      offset?: number;
+      orderBy?: string;
+      where?: {
+        proposalId_eq?: string;
+        proposer_eq?: string;
+        voters_every?: {
+          voter_eq?: string;
+          support_eq?: number;
+        };
+      };
+      voter?: string;
+    } = {}
+  ) => {
+    const response = await request<Types.ProposalListResponse>(
+      endpoint,
+      Queries.GET_PROPOSALS_LIST,
+      options
+    );
+    return response?.proposals ?? [];
+  },
+  getProposalsByDescription: async (
+    endpoint: string,
+    options: {
+      limit?: number;
+      offset?: number;
+      orderBy?: string;
+      where?: {
+        description_containsInsensitive?: string;
+      };
+    } = {}
+  ) => {
+    const response = await request<Types.ProposalDescriptionResponse>(
+      endpoint,
+      Queries.GET_PROPOSALS_BY_DESCRIPTION,
+      options
+    );
+    return response?.proposals ?? [];
+  },
+  getProposalMetrics: async (endpoint: string) => {
+    const response = await request<Types.ProposalMetricsResponse>(
+      endpoint,
+      Queries.GET_PROPOSAL_METRICS
+    );
+    return response?.dataMetrics?.[0] ?? emptyProposalMetrics;
+  },
+
+  getProposalVoteRate: async (endpoint: string, voter: string, limit = 10) => {
+    if (!voter) {
+      return [] as Types.ProposalVoteRateResponse["proposals"];
+    }
+    const response = await request<Types.ProposalVoteRateResponse>(
+      endpoint,
+      Queries.GET_PROPOSAL_VOTE_RATE,
+      {
+        limit,
+        voter: voter.toLowerCase(),
+      }
+    );
+    return response?.proposals ?? [];
+  },
+  getSummaryProposalStates: async (daoCode: string) => {
+    if (!daoCode) {
+      return [] as Types.SummaryProposalStateItem[];
+    }
+
+    const endpoint = degovGraphqlApi();
+    if (!endpoint) {
+      return [] as Types.SummaryProposalStateItem[];
+    }
+
+    try {
+      const response = await request<Types.SummaryProposalStatesResponse>(
+        endpoint,
+        Queries.GET_SUMMARY_PROPOSAL_STATES,
+        {
+          daoCode,
+        }
+      );
+      return response?.summaryProposalStates ?? [];
+    } catch (error) {
+      console.error("Failed to load summary proposal states:", error);
+      return [];
+    }
+  },
+
+  getBotAddress: async () => {
+    const endpoint = degovGraphqlApi();
+    if (!endpoint) {
+      return undefined;
+    }
+
+    try {
+      const response = await request<{ botAddress: string }>(
+        endpoint,
+        Queries.GET_BOT_ADDRESS
+      );
+      return response?.botAddress;
+    } catch (error) {
+      console.error("Failed to get bot address:", error);
+      return undefined;
+    }
+  },
+
+  getProposalSummary: async (options: {
+    proposalId: string;
+    daoCode: string;
+  }) => {
+    const endpoint = degovGraphqlApi();
+    if (!endpoint) {
+      return undefined;
+    }
+
+    try {
+      const response = await request<{ proposalSummary: string }>(
+        endpoint,
+        Queries.GET_PROPOSAL_SUMMARY,
+        options
+      );
+      return response?.proposalSummary;
+    } catch (error) {
+      console.error("Failed to get proposal summary:", error);
+      return undefined;
+    }
+  },
+
+  getProposalCanceledById: async (endpoint: string, id: string) => {
+    const response = await request<Types.ProposalCanceledByIdResponse>(
+      endpoint,
+      Queries.GET_PROPOSAL_CANCELED_BY_ID,
+      {
+        where: {
+          proposalId_eq: id,
+        },
+      }
+    );
+    return response?.proposalCanceleds?.[0];
+  },
+  getProposalExecutedById: async (endpoint: string, id: string) => {
+    const response = await request<Types.ProposalExecutedByIdResponse>(
+      endpoint,
+      Queries.GET_PROPOSAL_EXECUTED_BY_ID,
+      {
+        where: {
+          proposalId_eq: id,
+        },
+      }
+    );
+    return response?.proposalExecuteds?.[0];
+  },
+  getProposalQueuedById: async (endpoint: string, id: string) => {
+    const response = await request<Types.ProposalQueuedByIdResponse>(
+      endpoint,
+      Queries.GET_PROPOSAL_QUEUED_BY_ID,
+      {
+        where: {
+          proposalId_eq: id,
+        },
+      }
+    );
+    return response?.proposalQueueds?.[0];
+  },
+  getEvmAbi: async (endpoint: string, input: EvmAbiInput) => {
+    const response = await request<EvmAbiResponse>(
+      endpoint,
+      Queries.GET_EVM_ABI,
+      {
+        chain: input.chain,
+        contract: input.contract,
+      }
+    );
+    return response?.evmAbi;
+  },
+};
+
+export const delegateService = {
+  getAllDelegates: async (
+    endpoint: string,
+    options: {
+      limit?: number;
+      offset?: number;
+      orderBy?: string;
+      where?: {
+        power_gt?: number;
+        toDelegate_eq?: string;
+      };
+    } = {}
+  ) => {
+    const response = await request<Types.DelegateResponse>(
+      endpoint,
+      Queries.GET_DELEGATES,
+      options
+    );
+    return response?.delegates ?? [];
+  },
+  getDelegateMappings: async (
+    endpoint: string,
+    options: {
+      where: {
+        from_eq: string;
+      };
+    } = {
+      where: {
+        from_eq: "",
+      },
+    }
+  ) => {
+    const response = await request<Types.DelegateMappingResponse>(
+      endpoint,
+      Queries.GET_DELEGATE_MAPPINGS,
+      options
+    );
+    return response?.delegateMappings ?? [];
+  },
+  getDelegateMappingsConnection: async (
+    endpoint: string,
+    options: {
+      where: {
+        toDelegate_eq: string;
+      };
+      orderBy: string[];
+    }
+  ) => {
+    const response = await request<Types.DelegateConnectionResponse>(
+      endpoint,
+      Queries.GET_DELEGATE_MAPPINGS_CONNECTION,
+      options
+    );
+    return response?.delegatesConnection;
+  },
+};
+
+export const squidStatusService = {
+  getSquidStatus: async (endpoint: string) => {
+    const response = await request<Types.SquidStatusResponse>(
+      endpoint,
+      Queries.GET_SQUID_STATUS
+    );
+    return response?.squidStatus;
+  },
+};
+
+export const treasuryService = {
+  getTreasuryAssets: async (
+    endpoint: string,
+    input: Types.TreasuryAssetsRequestVariables
+  ) => {
+    const response = await request<
+      Types.TreasuryAssetsResponse,
+      Types.TreasuryAssetsRequestVariables
+    >(endpoint, Queries.GET_TREASURY_ASSETS, {
+      chain: input.chain,
+      address: input.address,
+    });
+
+    return response?.treasuryAssets ?? [];
+  },
+};
+
+export const contributorService = {
+  getAllContributors: async (
+    endpoint: string,
+    options: {
+      limit: number;
+      offset: number;
+      orderBy?: string | string[];
+      where?: {
+        id_in?: string[];
+        id_not_eq?: string;
+        id_eq?: string;
+      };
+    } = {
+      limit: 10,
+      offset: 0,
+      orderBy: "lastVoteTimestamp_DESC_NULLS_LAST",
+      where: {
+        id_in: [],
+        id_not_eq: undefined,
+      },
+    }
+  ) => {
+    const orderByInput = Array.isArray(options?.orderBy)
+      ? options?.orderBy
+      : options?.orderBy
+      ? [options.orderBy]
+      : ["lastVoteTimestamp_DESC_NULLS_LAST"];
+
+    const response = await request<Types.ContributorResponse>(
+      endpoint,
+      Queries.GET_CONTRIBUTORS,
+      {
+        limit: options?.limit,
+        offset: options?.offset,
+        orderBy: orderByInput,
+        where: options?.where,
+      }
+    );
+    return response?.contributors ?? [];
+  },
+};
+
+export const profileService = {
+  getProfile: async (
+    address: string
+  ): Promise<{
+    code: number;
+    data: ProfileData;
+  }> => {
+    const response = await fetch(`/api/profile/${address}`, {
+      next: { revalidate: 300, tags: [`profile-${address}`] },
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+    const data = await response.json();
+    return data;
+  },
+
+  updateProfile: async (address: string, profile: Partial<ProfileData>) => {
+    const token = getToken(address);
+    const response = await fetch(`/api/profile/${address}`, {
+      method: "POST",
+      body: JSON.stringify(profile),
+      cache: "no-store",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+    if (response.status === 401) {
+      clearToken(address);
+      return { code: 401, msg: "Unauthorized" } as const;
+    }
+    const data = await response.json();
+    return data;
+  },
+};
+
+export const memberService = {
+  getMembers: async (
+    checkpoint?: number,
+    limit?: number
+  ): Promise<Types.MemberResponse> => {
+    try {
+      const url = new URL("/api/degov/members", window.location.origin);
+
+      if (checkpoint) {
+        url.searchParams.set("checkpoint", checkpoint.toString());
+      }
+
+      if (limit) {
+        url.searchParams.set("limit", limit.toString());
+      }
+
+      const response = await fetch(url.toString(), {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (response.status === 401) {
+        return {
+          code: 401,
+          data: [],
+          message: "Unauthorized",
+        };
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error("Error fetching members:", error);
+      return {
+        code: 500,
+        data: [],
+        message: (error as Error)?.message || "Failed to fetch members",
+      };
+    }
+  },
+
+  // ### [degov] Profile pull
+  // POST https://degov-dev.vercel.app/api/profile/pull
+  // Content-Type: application/json
+
+  // [
+  //   "0x92e9fb99e99d79bc47333e451e7c6490dbf24b22",
+  //   "0xa23d90f2fb496f3055d3d96a2dc991e9133efee9"
+  // ]
+
+  getMemberTotal: async (): Promise<Types.MemberTotalResponse> => {
+    const response = await fetch(`/api/degov/metrics`, {
+      next: { revalidate: 60, tags: ["member-metrics"] },
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+    const data = await response.json();
+    return data;
+  },
+
+  // ### [degov] Profile pull
+  getProfilePull: async (
+    addresses: string[]
+  ): Promise<Types.ProfilePullResponse> => {
+    const response = await fetch(`/api/profile/pull`, {
+      method: "POST",
+      body: JSON.stringify(addresses),
+    });
+    const data = await response.json();
+    return data;
+  },
+};
+export { Types };
+
+export { Queries };
+
+export { Mutations };

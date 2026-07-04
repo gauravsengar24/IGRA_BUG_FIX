@@ -1,0 +1,41 @@
+# Node.js dependencies and build artifacts
+node_modules/
+package-lock.json
+
+# Hardhat build artifacts
+artifacts/
+cache/
+out/
+coverage/
+coverage.json
+
+# Docker runtime data directories
+reth-data/
+reth-source-data/
+reth-test-data/
+
+
+# Git metadata
+.git/
+.gitignore
+.gitmodules
+
+# Documentation
+README.md
+docs/
+
+# Test files (not needed in Docker build)
+test/
+
+# Note: scripts/ is needed for cl-simulator.js, so we don't exclude it
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db

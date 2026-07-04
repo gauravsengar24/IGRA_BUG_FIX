@@ -1,0 +1,222 @@
+
+
+### === ivotes
+
+type DelegateChanged @entity {
+  id: ID!
+  delegator: String! # address
+  fromDelegate: String! # address
+  toDelegate: String! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: String!
+}
+
+type DelegateVotesChanged @entity {
+  id: ID!
+  delegate: String! # address
+  previousVotes: BigInt! # uint256
+  newVotes: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: String!
+}
+
+type TokenTransfer @entity {
+  id: ID!
+  from: String!
+  to: String!
+  value: BigInt!
+  standard: String!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: String!
+}
+
+### === igovernor
+
+type ProposalCanceled @entity {
+  id: ID!
+  proposalId: String! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: String!
+}
+
+type ProposalCreated @entity {
+  id: ID!
+  proposalId: String! # uint256
+  proposer: String! # address
+  targets: [String!]! # address[]
+  values: [String!]! # uint256[] ## [BigInt!]!
+  signatures: [String!]! # string[]
+  calldatas: [String!]! # bytes[]
+  voteStart: BigInt! # uint256
+  voteEnd: BigInt! # uint256
+  description: String! # string
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: String!
+}
+
+type ProposalExecuted @entity {
+  id: ID!
+  proposalId: String! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: String!
+}
+
+type ProposalQueued @entity {
+  id: ID!
+  proposalId: String! # uint256
+  etaSeconds: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: String!
+}
+
+type VoteCast @entity {
+  id: ID!
+  voter: String! # address
+  proposalId: String! # uint256
+  support: Int! # uint8
+  weight: BigInt! # uint256
+  reason: String! # string
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: String!
+}
+
+type VoteCastWithParams @entity {
+  id: ID!
+  voter: String! # address
+  proposalId: String! # uint256
+  support: Int! # uint8
+  weight: BigInt! # uint256
+  reason: String! # string
+  params: String! # bytes
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: String!
+}
+
+
+### ====== custom
+
+type VoteCastGroup @entity {
+  id: ID!
+  proposal: Proposal!
+  type: String!
+  voter: String! # address
+  refProposalId: String! # uint256
+  support: Int! # uint8
+  weight: BigInt! # uint256
+  reason: String! # string
+  params: String # bytes
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: String!
+}
+
+type Proposal @entity {
+  id: ID!
+  proposalId: String! # uint256
+  proposer: String! # address
+  targets: [String!]! # address[]
+  values: [String!]! # uint256[] ## [BigInt!]!
+  signatures: [String!]! # string[]
+  calldatas: [String!]! # bytes[]
+  voteStart: BigInt! # uint256
+  voteEnd: BigInt! # uint256
+  description: String! # string
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: String!
+  voters: [VoteCastGroup!] @derivedFrom(field: "proposal")
+
+  metricsVotesCount: Int
+  metricsVotesWithParamsCount: Int
+  metricsVotesWithoutParamsCount: Int
+  metricsVotesWeightForSum: BigInt
+  metricsVotesWeightAgainstSum: BigInt
+  metricsVotesWeightAbstainSum: BigInt
+
+  title: String!
+  voteStartTimestamp: BigInt!
+  voteEndTimestamp: BigInt!
+  blockInterval: String
+  clockMode: String!
+  quorum: BigInt!
+  decimals: BigInt!
+}
+
+
+type DataMetric @entity {
+  id: ID! # global (or chain id?)
+  proposalsCount: Int
+  votesCount: Int
+  votesWithParamsCount: Int
+  votesWithoutParamsCount: Int
+  votesWeightForSum: BigInt
+  votesWeightAgainstSum: BigInt
+  votesWeightAbstainSum: BigInt
+  powerSum: BigInt
+  memberCount: Int
+}
+
+
+type DelegateRolling @entity {
+  id: ID! # tx hash
+  delegator: String! # address
+  fromDelegate: String! # address
+  toDelegate: String! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: String!
+
+  fromPreviousVotes: BigInt # uint256
+  fromNewVotes: BigInt # uint256
+
+  toPreviousVotes: BigInt # uint256
+  toNewVotes: BigInt # uint256
+}
+
+type Delegate @entity {
+  id: ID! # tx hash
+  fromDelegate: String! # address
+  toDelegate: String!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: String!
+
+  power: BigInt!
+}
+
+type Contributor @entity {
+  id: ID! # tx hash
+
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: String!
+
+  lastVoteBlockNumber: BigInt
+  lastVoteTimestamp: BigInt
+
+  power: BigInt!
+
+  delegatesCountAll: Int!
+  delegatesCountEffective: Int!
+}
+
+type DelegateMapping @entity {
+  id: ID! # from
+  from: String! # address
+  to: String! # address
+
+  power: BigInt!
+
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: String!
+}

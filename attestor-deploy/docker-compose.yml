@@ -1,0 +1,50 @@
+services:
+  attestor:
+    image: igranetwork/attestor:${ATTESTOR_VERSION:-latest}
+    container_name: attestor
+    restart: unless-stopped
+    environment:
+      - RPC_URL=${RPC_URL}
+      - CONTRACT_ADDRESS=${CONTRACT_ADDRESS}
+      - CHAIN_ID=${CHAIN_ID}
+      - HEALTH_PORT=${HEALTH_PORT:-8180}
+      - METRICS_PORT=${METRICS_PORT:-9190}
+      - LOG_DIR=/app/logs
+      - RUST_LOG=${RUST_LOG:-igra_attestation=info}
+      - REORG_SAFETY_BLOCKS=${REORG_SAFETY_BLOCKS:-30}
+      - CONTROLLER_ADDRESS=${CONTROLLER_ADDRESS:-}
+      - DELEGATION_EXPIRY=${DELEGATION_EXPIRY:-}
+      - DELEGATION_SIGNATURE=${DELEGATION_SIGNATURE:-}
+    secrets:
+      - private_key
+    ports:
+      - "127.0.0.1:${HEALTH_PORT:-8180}:${HEALTH_PORT:-8180}"
+      - "127.0.0.1:${METRICS_PORT:-9190}:${METRICS_PORT:-9190}"
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - igra-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://127.0.0.1:${HEALTH_PORT:-8180}/ || exit 1",
+        ]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+secrets:
+  private_key:
+    file: ./secrets/private_key.txt
+
+networks:
+  igra-network:
+    external: true
+    name: igra-orchestra-${NETWORK}_igra-network

@@ -1,0 +1,32 @@
+[package]
+name = "kaswallet-test-integration"
+
+rust-version.workspace = true
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+include.workspace = true
+
+[dependencies]
+
+[features]
+integration-tests = []
+
+[dev-dependencies]
+rstest.workspace = true
+kaswallet-common.workspace = true
+kaswallet-daemon.workspace = true
+kaswallet-create.workspace = true
+kaswallet-client.workspace = true
+kaswallet-test-helpers.workspace = true
+
+kaspa-consensus-core.workspace = true
+kaspa-grpc-client.workspace = true
+kaspa-addresses.workspace = true
+kaspa-txscript.workspace = true
+
+tonic.workspace = true
+tokio.workspace = true
+thiserror.workspace = true

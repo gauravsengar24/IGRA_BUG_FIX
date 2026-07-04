@@ -1,0 +1,257 @@
+"use client";
+
+import { useCallback, useMemo, useState } from "react";
+import { toast } from "react-toastify";
+
+import { NotificationIcon } from "@/components/icons";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useDaoConfig } from "@/hooks/useDaoConfig";
+import { useEnsureAuth } from "@/hooks/useEnsureAuth";
+import {
+  useNotificationFeatures,
+  useSubscribeDao,
+  useNotificationChannels,
+} from "@/hooks/useNotification";
+import { FeatureName } from "@/services/graphql/types/notifications";
+import { extractErrorMessage } from "@/utils/graphql-error-handler";
+
+import { EmailBindForm } from "./email-bind-form";
+import { SettingsPanel } from "./settings-panel";
+import { NotificationSkeleton } from "./skeleton";
+
+// Constants
+const FEATURE_KEYS = [FeatureName.PROPOSAL_NEW, FeatureName.VOTE_END] as const;
+
+// Helper functions
+const createFeature = (name: FeatureName, strategy: "true" | "false") => ({
+  name,
+  strategy,
+});
+
+interface NotificationSettings {
+  email?: string;
+  [FeatureName.PROPOSAL_NEW]: boolean;
+  [FeatureName.VOTE_END]: boolean;
+}
+
+interface CountdownState {
+  active: boolean;
+  duration: number;
+  key: number;
+}
+
+export const NotificationDropdown = () => {
+  const config = useDaoConfig();
+  const [isOpen, setIsOpen] = useState(false);
+  const { ensureAuth, isAuthenticating } = useEnsureAuth();
+
+  const {
+    data: channelData,
+    isLoading: channelsLoading,
+    refetch,
+  } = useNotificationChannels(isOpen);
+
+  const isEmailBound = channelData?.isEmailBound ?? false;
+  const emailAddress = channelData?.emailAddress;
+
+  const {
+    newProposals,
+    votingEndReminder,
+    isLoading: featuresLoading,
+  } = useNotificationFeatures(isEmailBound && isOpen, config?.code);
+
+  const subscribeDao = useSubscribeDao();
+
+  const baseSettings = useMemo(
+    () => ({
+      [FeatureName.PROPOSAL_NEW]: !!newProposals,
+      [FeatureName.VOTE_END]: !!votingEndReminder,
+    }),
+    [newProposals, votingEndReminder]
+  );
+
+  // Optimistic settings; null means fall back to latest server values
+  const [optimisticSettings, setOptimisticSettings] =
+    useState<NotificationSettings | null>(null);
+
+  const settings = optimisticSettings ?? baseSettings;
+
+  const [countdown, setCountdown] = useState<CountdownState>({
+    active: false,
+    duration: 60,
+    key: 0,
+  });
+
+
+  // Handle dropdown open change with authentication check
+  const handleOpenChange = useCallback(
+    async (open: boolean) => {
+      if (open) {
+        // When opening dropdown, ensure user is authenticated
+        const authResult = await ensureAuth();
+        if (!authResult.success) {
+          return;
+        }
+      }
+      if (!open) {
+        // Drop any optimistic state when closing so we resync with server next open
+        setOptimisticSettings(null);
+      }
+      setIsOpen(open);
+    },
+    [ensureAuth]
+  );
+
+  // Refetch channels after email verification
+  const handleVerified = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
+
+  // Helper function to handle subscription errors
+  const handleSubscriptionError = useCallback(
+    (
+      error: unknown,
+      rollbackSettings: NotificationSettings,
+      operation: string
+    ) => {
+      // Roll back optimistic state on failure
+      setOptimisticSettings(rollbackSettings);
+      const errorMessage = extractErrorMessage(error);
+      toast.error(errorMessage || `Failed to ${operation}`);
+    },
+    []
+  );
+
+  // Helper function to subscribe to features
+  const subscribeToFeatures = useCallback(
+    (
+      features: { name: FeatureName; strategy: "true" | "false" }[],
+      rollbackSettings: NotificationSettings,
+      operation: string
+    ) => {
+      subscribeDao.mutate(
+        { daoCode: config?.code, features },
+        {
+          onError: (error) =>
+            handleSubscriptionError(error, rollbackSettings, operation),
+        }
+      );
+    },
+    [config?.code, subscribeDao, handleSubscriptionError]
+  );
+
+  const handleSettingToggle = useCallback(
+    (
+      setting: FeatureName.PROPOSAL_NEW | FeatureName.VOTE_END,
+      enabled: boolean
+    ) => {
+      const nextSettings: NotificationSettings = {
+        ...settings,
+        [setting]: enabled,
+      };
+
+      // Optimistically update UI
+      setOptimisticSettings(nextSettings);
+
+      if (enabled) {
+        // Subscribe: include this setting + all other active settings
+        const activeFeatures = FEATURE_KEYS.filter((key) => {
+          const value = settings[key];
+          return key === setting || value;
+        }).map((key) => createFeature(key, "true"));
+
+        subscribeToFeatures(activeFeatures, settings, "subscribe to");
+      } else {
+        // Unsubscribe: check if other features are still active
+        const otherActiveFeatures = FEATURE_KEYS.filter((key) => {
+          const value = settings[key];
+          return key !== setting && value;
+        });
+
+        if (otherActiveFeatures.length === 0) {
+          // No other features active, disable all
+          const allFeaturesDisabled = FEATURE_KEYS.map((key) =>
+            createFeature(key, "false")
+          );
+          subscribeToFeatures(allFeaturesDisabled, settings, "update subscription for");
+        } else {
+          // Keep other active features
+          const remainingFeatures = otherActiveFeatures.map((key) =>
+            createFeature(key, "true")
+          );
+          subscribeToFeatures(remainingFeatures, settings, "update subscription for");
+        }
+      }
+    },
+    [settings, subscribeToFeatures]
+  );
+
+  const handleStartCountdown = useCallback((duration: number) => {
+    setCountdown({
+      active: true,
+      duration,
+      key: Math.random(),
+    });
+  }, []);
+
+  const handleEndCountdown = useCallback(() => {
+    setCountdown((prev) => ({
+      ...prev,
+      active: false,
+    }));
+  }, []);
+
+  const handleCountdownTick = useCallback((remaining: number) => {
+    // Use setTimeout to avoid setState during render
+    setTimeout(() => {
+      setCountdown((prev) => ({
+        ...prev,
+        duration: remaining,
+      }));
+    }, 0);
+  }, []);
+
+  return (
+    <DropdownMenu open={isOpen} onOpenChange={handleOpenChange}>
+      <DropdownMenuTrigger asChild>
+        <Button
+          className="lg:border lg:border-border rounded-full w-[42px] bg-card lg:bg-background h-[42px] lg:rounded-[10px] border-input p-0 flex items-center justify-center focus-visible:outline-hidden focus-visible:ring-0 focus-visible:ring-offset-0"
+          variant="outline"
+          disabled={isAuthenticating}
+        >
+          <NotificationIcon className="h-[20px] w-[20px]" />
+        </Button>
+      </DropdownMenuTrigger>
+
+      {!isOpen ? null : channelsLoading ? (
+        <NotificationSkeleton />
+      ) : isEmailBound ? (
+        featuresLoading ? (
+          <NotificationSkeleton />
+        ) : (
+          <SettingsPanel
+            email={emailAddress || undefined}
+            newProposals={settings[FeatureName.PROPOSAL_NEW]}
+            votingEndReminder={settings[FeatureName.VOTE_END]}
+            onToggle={handleSettingToggle}
+          />
+        )
+      ) : (
+        <EmailBindForm
+          onVerified={handleVerified}
+          countdownActive={countdown.active}
+          countdownDuration={countdown.duration}
+          countdownKey={countdown.key}
+          onStartCountdown={handleStartCountdown}
+          onEndCountdown={handleEndCountdown}
+          onCountdownTick={handleCountdownTick}
+          isLoading={channelsLoading}
+        />
+      )}
+    </DropdownMenu>
+  );
+};

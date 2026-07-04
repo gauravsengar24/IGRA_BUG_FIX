@@ -1,0 +1,28 @@
+services:
+  extSrv:
+    image: nginx
+    volumes:
+      - ./index_ext.html:/usr/share/nginx/html/index.html:ro
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    expose:
+      - "80"
+    networks:
+      ext_net:
+        aliases:
+          - extSrv1
+      int_net:
+
+  intSrv:
+    image: nginx
+    volumes:
+      - ./index_int.html:/usr/share/nginx/html/index.html:ro
+    networks:
+      int_net:
+        aliases:
+          - intSrv1
+
+networks:
+  ext_net:
+    external: true
+  int_net:
+    external: true

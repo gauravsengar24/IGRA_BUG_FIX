@@ -1,0 +1,144 @@
+import { useMemo } from "react";
+import { erc20Abi, erc721Abi } from "viem";
+import { useReadContracts } from "wagmi";
+
+import { DEFAULT_MULTICALL_BATCH_SIZE } from "@/config/base";
+
+import { useDaoConfig } from "./useDaoConfig";
+
+import type { Abi } from "viem";
+
+type TokenDetails = {
+  contract: string;
+  standard: string;
+};
+
+type UseGetTokenInfoOptions = {
+  chainId?: number;
+  enabled?: boolean;
+};
+
+export const useGetTokenInfo = (
+  tokenList: TokenDetails[],
+  options: UseGetTokenInfoOptions = {}
+) => {
+  const daoConfig = useDaoConfig();
+  const baseContract = useMemo(() => {
+    return tokenList.map((v) => {
+      return {
+        address: v.contract as `0x${string}`,
+        abi: v.standard === "ERC20" ? erc20Abi : erc721Abi,
+        standard: v.standard,
+      };
+    });
+  }, [tokenList]);
+
+  const resolvedChainId =
+    options.chainId ?? daoConfig?.chain?.id ?? undefined;
+  const isEnabled = options.enabled ?? true;
+
+  const contractCalls = useMemo(() => {
+    const calls: {
+      address: `0x${string}`;
+      abi: Abi;
+      functionName: string;
+      chainId?: number;
+    }[] = [];
+
+    if (resolvedChainId === undefined) return calls;
+
+    baseContract.forEach((contract) => {
+      calls.push({
+        address: contract.address,
+        abi: contract.abi,
+        functionName: "symbol",
+        chainId: resolvedChainId,
+      });
+    });
+
+    baseContract.forEach((contract) => {
+      if (contract.standard === "ERC20") {
+        calls.push({
+          address: contract.address,
+          abi: contract.abi,
+          functionName: "decimals",
+          chainId: resolvedChainId,
+        });
+      }
+    });
+
+    return calls;
+  }, [baseContract, resolvedChainId]);
+
+  const symbolResults = useReadContracts({
+    contracts: contractCalls,
+    batchSize: DEFAULT_MULTICALL_BATCH_SIZE,
+    query: {
+      enabled:
+        isEnabled &&
+        contractCalls.length > 0 &&
+        resolvedChainId !== undefined,
+    },
+  });
+
+  const tokenInfo = useMemo(() => {
+    if (!baseContract || baseContract.length === 0) {
+      return {};
+    }
+
+    const result: { [key: string]: { symbol: string; decimals: number } } = {};
+    const tokenCount = baseContract.length;
+
+    for (let i = 0; i < tokenCount; i++) {
+      const contractAddress = baseContract[i].address;
+      const standard = baseContract[i].standard;
+      const symbolData = symbolResults.data?.[i]?.result;
+
+      try {
+        let decimalsValue = 0;
+
+        if (standard === "ERC20") {
+          const decimalsData =
+            symbolResults.data?.[
+              tokenCount +
+                baseContract.findIndex(
+                  (c) => c.standard === "ERC20" && c.address === contractAddress
+                )
+            ];
+
+          if (decimalsData?.result !== undefined) {
+            decimalsValue =
+              typeof decimalsData.result === "bigint"
+                ? Number(decimalsData.result)
+                : typeof decimalsData.result === "number"
+                ? decimalsData.result
+                : 18;
+          }
+        }
+
+        if (symbolData !== undefined) {
+          result[contractAddress] = {
+            symbol: String(symbolData),
+            decimals: decimalsValue,
+          };
+        }
+      } catch (error) {
+        console.error(
+          `Error processing token data for ${contractAddress}:`,
+          error
+        );
+      }
+    }
+
+    return result;
+  }, [baseContract, symbolResults.data]);
+
+  return {
+    tokenInfo,
+    isFetching: symbolResults.isFetching,
+    isError: symbolResults.isError,
+    error: symbolResults.error,
+    getTokenInfo: (address: string) =>
+      tokenInfo[address as `0x${string}`] || null,
+  };
+};

@@ -1,0 +1,104 @@
+"use client";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { isNumber } from "lodash-es";
+import { useBlockNumber, useReadContract } from "wagmi";
+
+import { abi as tokenAbi } from "@/config/abi/token";
+import { useDaoConfig } from "@/hooks/useDaoConfig";
+import { useFormatGovernanceTokenAmount } from "@/hooks/useFormatGovernanceTokenAmount";
+import { proposalService } from "@/services/graphql";
+import { formatNumberForDisplay } from "@/utils/number";
+
+import { OverviewItem } from "./overview-item";
+import { OverviewProposalsSummaryDropdown } from "./overview-proposals-summary";
+
+export const Overview = () => {
+  const daoConfig = useDaoConfig();
+  const formatTokenAmount = useFormatGovernanceTokenAmount();
+
+  const { data: blockNumber } = useBlockNumber({
+    chainId: daoConfig?.chain?.id,
+    query: { enabled: !!daoConfig?.chain?.id },
+  });
+
+  const { data: totalSupply, isLoading: isTotalSupplyLoading } =
+    useReadContract({
+      address: daoConfig?.contracts?.governorToken?.address as `0x${string}`,
+      abi: tokenAbi,
+      functionName: "getPastTotalSupply",
+      args: blockNumber ? [blockNumber - 1n] : undefined,
+      chainId: daoConfig?.chain?.id,
+      query: {
+        enabled:
+          !!blockNumber &&
+          !!daoConfig?.contracts?.governorToken?.address &&
+          !!daoConfig?.chain?.id,
+        placeholderData: keepPreviousData,
+      },
+    });
+
+  const { data: dataMetrics, isLoading: isProposalMetricsLoading } = useQuery({
+    queryKey: ["dataMetrics", daoConfig?.indexer?.endpoint],
+    queryFn: () =>
+      proposalService.getProposalMetrics(daoConfig?.indexer?.endpoint ?? ""),
+    enabled: !!daoConfig?.indexer?.endpoint,
+    placeholderData: keepPreviousData,
+  });
+
+  return (
+    <div className="flex flex-col gap-[15px] lg:gap-[20px]">
+      <h3 className="text-[16px] lg:text-[18px] font-extrabold text-foreground">
+        Overview
+      </h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-[15px] lg:gap-[20px] xl:grid-cols-4">
+        <OverviewItem
+          title="Proposals"
+          link={`/proposals`}
+          icon="/assets/image/proposals-colorful.svg"
+          isLoading={isProposalMetricsLoading}
+          priority
+        >
+          <>
+            <div className="flex items-center gap-[8px] lg:gap-[10px]">
+              {
+                formatNumberForDisplay(
+                  isNumber(dataMetrics?.proposalsCount)
+                    ? dataMetrics?.proposalsCount
+                    : 0,
+                  0
+                )[0]
+              }
+              <OverviewProposalsSummaryDropdown daoCode={daoConfig?.code} />
+            </div>
+          </>
+        </OverviewItem>
+        <OverviewItem
+          title="Delegates"
+          link={`/delegates`}
+          icon="/assets/image/members-colorful.svg"
+          isLoading={isProposalMetricsLoading}
+        >
+          {formatNumberForDisplay(dataMetrics?.memberCount ?? 0, 0)[0]}
+        </OverviewItem>
+        <OverviewItem
+          title="Total Voting Power"
+          icon="/assets/image/total-vote-colorful.svg"
+          isLoading={isProposalMetricsLoading}
+        >
+          {
+            formatTokenAmount(
+              dataMetrics?.powerSum ? BigInt(dataMetrics?.powerSum) : 0n
+            )?.formatted
+          }
+        </OverviewItem>
+        <OverviewItem
+          title="Total Supply"
+          isLoading={isTotalSupplyLoading}
+          icon="/assets/image/delegated-vote-colorful.svg"
+        >
+          {formatTokenAmount(totalSupply ?? 0n)?.formatted}
+        </OverviewItem>
+      </div>
+    </div>
+  );
+};

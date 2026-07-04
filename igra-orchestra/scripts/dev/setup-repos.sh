@@ -1,0 +1,323 @@
+#!/bin/bash
+# setup-repos.sh - Clone and setup repositories for Igra Orchestra
+
+# Function to print help information
+function print_help() {
+    echo "Usage: ./scripts/dev/setup-repos.sh"
+    echo ""
+    echo "Description:"
+    echo "  This script clones and configures repositories for Igra Orchestra."
+    echo "  It sets up each repository in the list with the appropriate branches."
+    echo ""
+    echo "Environment Variables:"
+    echo "  You can override the default branches for each repository by setting the following environment variables:"
+    echo "    RETH_BRANCH"
+    echo "    KASWALLET_BRANCH"
+    echo "    IGRA_RPC_PROVIDER_BRANCH"
+    echo "    KASPAD_BRANCH"
+    echo ""
+    echo "Examples:"
+    echo "  ./scripts/dev/setup-repos.sh"
+    echo ""
+    echo "  # Example with environment variables:"
+    echo "  KASWALLET_BRANCH=my-branch ./scripts/dev/setup-repos.sh"
+    echo ""
+    echo "Notes:"
+    echo "  - Ensure you have the required permissions and SSH key set up to clone from private repositories."
+    echo "  - Environment variables must be set before calling the script to take effect."
+}
+
+if [[ "$1" == "--help" || "$1" == "-h" ]]; then
+    print_help
+    exit 0
+fi
+
+# Function for timestamped log messages
+function log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
+}
+
+function panic() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2
+    echo >&2
+    echo "Try './scripts/dev/setup-repos.sh --help'" >&2
+    exit 1
+}
+
+function load_env_file() {
+    local file=$1
+    local mode=${2:-override}
+    local line key value
+
+    [[ -f "$file" ]] || return 0
+
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line%$'\r'}"
+        [[ "$line" =~ ^[[:space:]]*($|#) ]] && continue
+        [[ "$line" == *"="* ]] || continue
+
+        key="${line%%=*}"
+        key="${key#"${key%%[![:space:]]*}"}"
+        key="${key%"${key##*[![:space:]]}"}"
+        [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+
+        if [[ "$mode" == "preserve" && -n "${!key+x}" ]]; then
+            continue
+        fi
+
+        value="${line#*=}"
+        value="${value#"${value%%[![:space:]]*}"}"
+        value="${value%"${value##*[![:space:]]}"}"
+        if [[ ${#value} -ge 2 ]]; then
+            case "$value" in
+                \"*\"|\'*\') value="${value:1:${#value}-2}" ;;
+            esac
+        fi
+
+        export "$key=$value"
+    done < "$file"
+}
+
+function find_unresolved_placeholders() {
+    local file
+
+    for file in "$@"; do
+        [[ -f "$file" ]] || continue
+        awk '
+            /^[[:space:]]*(#|$)/ { next }
+            /TODO_[A-Z0-9_]*(_REPLACE_ME)?/ {
+                printf "%s:%d:%s\n", FILENAME, FNR, $0
+            }
+        ' "$file"
+    done
+}
+
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Project root is two levels up from scripts/dev/
+PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# Load environment variables from .env file if it exists
+if [[ -f "$PROJECT_DIR/.env" ]]; then
+    log "Loading environment variables from .env file"
+    load_env_file "$PROJECT_DIR/.env"
+else
+    log ".env file not found, using default branch settings or environment variables."
+fi
+
+# Check if using pre-built images
+USE_PREBUILT_IMAGES=${USE_PREBUILT_IMAGES:-false}
+
+# Function to clone a repository if it doesn't exist
+function clone_repo() {
+    local repo_url=$1
+    # Extract, e.g. kaswallet from git@github.com:IgraLabs/kaswallet.git
+    local folder
+    folder=$(basename -s .git "$repo_url")
+
+    log "Setting up $folder repository"
+    if [[ -d "$PROJECT_DIR/build/repos/$folder" ]]; then
+        log "$folder repository already exists, skipping clone"
+    else
+        log "Cloning $folder repository..."
+        if git clone "$repo_url" "$PROJECT_DIR/build/repos/$folder"; then
+            log "Successfully cloned $folder repository"
+        else
+            panic "Failed to clone $folder repository"
+        fi
+    fi
+}
+
+# Function to configure a repository
+function configure_repo() {
+    local repo_name=$1
+    local repo_url=$2
+    local branch=$3
+
+    log "Configuring $repo_name repository"
+    local folder
+    folder=$(basename -s .git "$repo_url")
+    cd "$PROJECT_DIR/build/repos/$folder" || panic "Failed to cd into $folder"
+    log "Current directory: $(pwd)"
+
+    log "Fetching latest changes..."
+    git fetch \
+        || panic "Failed to fetch changes for $repo_name"
+
+    log "Checking out branch: $branch"
+    git checkout "$branch" \
+        || panic "Failed to checkout branch $branch for $repo_name"
+
+    log "Pulling latest changes..."
+    git pull \
+        || panic "Failed to pull latest changes for $repo_name"
+
+    log "Current branch info for $repo_name:"
+    git --no-pager branch -v
+
+    # Return to the project directory
+    cd "$PROJECT_DIR" || panic "Failed to cd back to project directory"
+}
+
+if [[ $# -gt 0 ]]; then
+    panic "Unexpected parameter(s) $*"
+fi
+
+# Default branches
+RETH_BRANCH=${RETH_BRANCH:-production}
+KASWALLET_BRANCH=${KASWALLET_BRANCH:-main}
+IGRA_RPC_PROVIDER_BRANCH=${IGRA_RPC_PROVIDER_BRANCH:-main}
+KASPAD_BRANCH=${KASPAD_BRANCH:-master}
+
+log "Starting repository setup"
+
+# Fail fast on unsupported NETWORK before any git clone work runs below.
+# Gated on non-empty NETWORK so source-mode default (NETWORK unset) is unchanged.
+if [[ -n "${NETWORK:-}" ]]; then
+    case "$NETWORK" in
+        mainnet|testnet-10|testnet)
+            : # supported (testnet is the legacy alias for testnet-10)
+            ;;
+        *)
+            panic "Unsupported NETWORK='$NETWORK'. Set NETWORK to lowercase 'mainnet' or 'testnet-10' (legacy 'testnet' is also accepted as an alias for 'testnet-10')."
+            ;;
+    esac
+fi
+
+# Check if using pre-built images for proprietary services
+if [[ "$USE_PREBUILT_IMAGES" == "true" ]]; then
+    log "USE_PREBUILT_IMAGES is set to true"
+    log "No source repositories need to be cloned; all services use pre-built Docker images"
+
+    REPOS=()
+    URLS=()
+    BRANCHES=()
+else
+    log "USE_PREBUILT_IMAGES is set to false (or not set)"
+    log "Will clone all repositories and build from source"
+
+    # Repository information - all repositories
+    REPOS=(
+        "reth             "
+        "kaswallet        "
+        "igra-rpc-provider"
+        "kaspad           "
+    )
+
+    URLS=(
+        "git@github.com:IgraLabs/reth-private.git"
+        "git@github.com:IgraLabs/kaswallet.git"
+        "git@github.com:IgraLabs/igra-rpc-provider.git"
+        "git@github.com:IgraLabs/rusty-kaspa-private.git"
+    )
+    BRANCHES=(
+        "$RETH_BRANCH"
+        "$KASWALLET_BRANCH"
+        "$IGRA_RPC_PROVIDER_BRANCH"
+        "$KASPAD_BRANCH"
+    )
+fi
+
+# Log branch information
+log "Using repos and branches:"
+for i in "${!REPOS[@]}"; do
+  log "  - ${REPOS[$i]} - ${URLS[$i]}::${BRANCHES[$i]}"
+done
+
+
+# Clone and configure repositories
+for i in "${!REPOS[@]}"; do
+    clone_repo "${URLS[$i]}"
+    configure_repo "${REPOS[$i]}" "${URLS[$i]}" "${BRANCHES[$i]}"
+done
+
+log
+log "==REPOSITORY SETUP COMPLETED SUCCESSFULLY=="
+log "Repositories configured as follows:"
+for i in "${!REPOS[@]}"; do
+  log "  - ${REPOS[$i]} ${BRANCHES[$i]}"
+done
+log ""
+
+# Provide appropriate instructions based on mode
+if [[ "$USE_PREBUILT_IMAGES" == "true" ]]; then
+    log "====================================================================="
+    log "IMPORTANT: Using pre-built images mode"
+    log "====================================================================="
+    log ""
+    log "Pulling pre-built images from Docker Hub..."
+
+    # Select the per-network version file and reject unsafe/mixed-case NETWORK values.
+    if [[ -z "${NETWORK:-}" ]]; then
+        panic "NETWORK is not set. Configure it in .env or export it before running with USE_PREBUILT_IMAGES=true."
+    fi
+    case "$NETWORK" in
+        mainnet)
+            versions_file="$PROJECT_DIR/versions.mainnet.env"
+            ;;
+        testnet-10|testnet)
+            # Transitional alias for Galleon.
+            versions_file="$PROJECT_DIR/versions.galleon-testnet.env"
+            ;;
+        *)
+            panic "Unsupported NETWORK='$NETWORK'. Set NETWORK to lowercase 'mainnet' or 'testnet-10' (legacy 'testnet' is also accepted as an alias for 'testnet-10')."
+            ;;
+    esac
+
+    if [[ -f "$versions_file" ]]; then
+        log "Loading default image versions from $(basename "$versions_file") (NETWORK=$NETWORK)"
+        # Preserve values already rendered into .env.
+        load_env_file "$versions_file" preserve
+    else
+        panic "Version file not found: $versions_file (NETWORK=$NETWORK)"
+    fi
+
+    placeholder_matches="$(find_unresolved_placeholders "$PROJECT_DIR/.env")"
+    if [[ -n "$placeholder_matches" ]]; then
+        echo "$placeholder_matches" >&2
+        panic "Replace all TODO_* placeholders in .env before pulling images."
+    fi
+
+    # Fail before docker pull if required tags or health-check values are unresolved.
+    for required_var in \
+        KASPAD_VERSION RETH_VERSION RPC_PROVIDER_VERSION KASWALLET_VERSION \
+        NODE_HEALTH_CHECK_VERSION ATAN_UPLOADER_VERSION \
+        HEALTH_CHECK_API_KEY NODE_HEALTH_CHECK_URL; do
+        value="${!required_var:-}"
+        value="${value#"${value%%[![:space:]]*}"}"
+        value="${value%"${value##*[![:space:]]}"}"
+        if [[ -z "$value" || "$value" == TODO_* ]]; then
+            panic "$required_var is unset or still a TODO_* placeholder. Replace it in .env before re-running."
+        fi
+    done
+
+    # Pull and tag images (versions from .env, falling back to the selected versions.*.env)
+    # Format: "image_name:version:local_tag"
+    images=(
+        "kaspad:${KASPAD_VERSION}:kaspad"
+        "reth:${RETH_VERSION}:execution-layer"
+        "rpc-provider:${RPC_PROVIDER_VERSION}:rpc-provider"
+        "kaswallet:${KASWALLET_VERSION}:kaswallet"
+    )
+    for entry in "${images[@]}"; do
+        IFS=':' read -r image version local_tag <<< "$entry"
+        log "Pulling igranetwork/${image}:${version}..."
+        if docker pull "igranetwork/${image}:${version}"; then
+            log "Tagging as ${local_tag}..."
+            docker tag "igranetwork/${image}:${version}" "${local_tag}"
+            log "✓ ${local_tag} ready"
+        else
+            panic "Failed to pull igranetwork/${image}:${version}. Make sure the image exists on Docker Hub."
+        fi
+    done
+
+    log ""
+    log "All images pulled and tagged successfully!"
+    log ""
+    log "You can now start services with:"
+    log "  docker compose up -d"
+    log ""
+    log "Note: Docker will use the pulled images instead of building from source."
+else
+    log "You can now run docker compose build && docker compose up"
+fi

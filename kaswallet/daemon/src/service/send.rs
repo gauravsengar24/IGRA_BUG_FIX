@@ -1,0 +1,59 @@
+use crate::service::kaswallet_service::KasWalletService;
+use common::error_location::ErrorLocation;
+use common::errors::{UserInputError, WalletError, WalletResult};
+use proto::kaswallet_proto::{SendRequest, SendResponse};
+use secrecy::SecretString;
+use std::time::Instant;
+use tracing::{debug, info};
+
+impl KasWalletService {
+    pub(crate) async fn send(&self, request: SendRequest) -> WalletResult<SendResponse> {
+        // lock utxo_manager at this point, so that if sync happens in the middle - it doesn't
+        // interfere with apply_transaction
+        let mut utxo_manager = self.utxo_manager.lock().await;
+
+        let send_start = Instant::now();
+        let transaction_description = match request.transaction_description {
+            Some(description) => description,
+            None => {
+                return Err(WalletError::from(UserInputError::MissingField {
+                    field: "transaction_description",
+                    location: ErrorLocation::capture(),
+                }));
+            }
+        };
+        debug!(
+            "Got a request for transaction: {:?}",
+            transaction_description
+        );
+
+        debug!("Creating unsigned transactions...");
+
+        let unsigned_transactions = self
+            .create_unsigned_transactions_from_description(transaction_description, &utxo_manager)
+            .await?;
+        debug!("Created {} transactions", unsigned_transactions.len());
+
+        debug!("Signing transactions...");
+        let password = SecretString::from(request.password);
+        let signed_transactions = self
+            .sign_transactions(unsigned_transactions, &password)
+            .await?;
+        debug!("Transactions got signed!");
+
+        debug!("Submitting transactions...");
+        let transaction_ids = self
+            .submit_transactions(&mut utxo_manager, &signed_transactions)
+            .await?;
+        debug!("Transactions submitted: {:?}", transaction_ids);
+
+        info!(
+            "Total time to serve send request: {:?}",
+            send_start.elapsed()
+        );
+        Ok(SendResponse {
+            transaction_ids,
+            signed_transactions: signed_transactions.into_iter().map(Into::into).collect(),
+        })
+    }
+}

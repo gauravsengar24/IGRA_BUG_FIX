@@ -1,0 +1,75 @@
+services:
+  # Execution Layer (EL) client: reth
+  reth-el:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.el
+    container_name: reth-el-node
+    ports:
+      - "8545:8545"  # HTTP RPC
+      - "8551:8551"  # Engine API (HTTP)
+      # Port 30303 (P2P) is NOT exposed to prevent external peer connections
+    volumes:
+      - reth-el-data:/root/.local/share/reth
+      - ../config/genesis.json:/genesis.json:ro
+      - ../config/jwt-secret:/jwt-secret:ro
+    environment:
+      - RUST_LOG=reth_engine_api=debug,reth_rpc=debug,reth_consensus=debug,debug
+    # Healthcheck: Check if RPC is available (POST request with JSON-RPC)
+    healthcheck:
+      test: ["CMD", "sh", "-c", "curl -f -X POST http://localhost:8545 -H 'Content-Type: application/json' -d '{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}' | grep -q '\"result\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - testnet-network
+    command:
+      - node
+      - --chain=/genesis.json
+      - --http
+      - --http.addr=0.0.0.0
+      - --http.port=8545
+      - --http.api=eth,debug,net,web3
+      - --ws
+      - --ws.addr=0.0.0.0
+      - --ws.port=8546
+      - --authrpc.addr=0.0.0.0
+      - --authrpc.port=8551
+      - --authrpc.jwtsecret=/jwt-secret/jwt.hex
+      - --disable-discovery
+
+  # Consensus Layer (CL) simulator: JavaScript-based CL client
+  cl-simulator:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.cl-simulator
+    container_name: cl-simulator-node
+    ports:
+      - "5052:5052"  # HTTP API (for health checks)
+    volumes:
+      - ../config/jwt-secret:/jwt-secret:ro
+    environment:
+      - EL_ENGINE_API_URL=http://reth-el:8551
+      - EL_RPC_URL=http://reth-el:8545
+      - CL_HTTP_PORT=5052
+      - JWT_SECRET_PATH=/jwt-secret/jwt.hex
+      - BLOCK_INTERVAL=2
+      - FEE_RECIPIENT=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+    depends_on:
+      reth-el:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - testnet-network
+
+volumes:
+  reth-el-data:
+
+networks:
+  testnet-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

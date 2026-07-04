@@ -1,0 +1,42 @@
+[package]
+name = "kaswallet-common"
+rust-version.workspace = true
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+include.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "common"
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+kaswallet-proto.workspace = true
+
+kaspa-consensus-core.workspace = true
+kaspa-bip32.workspace = true
+kaspa-hashes.workspace = true
+kaspa-addresses.workspace = true
+kaspa-txscript.workspace = true
+kaspa-rpc-core.workspace = true
+
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+argon2 = { workspace = true, features = ["std"] }
+chacha20poly1305.workspace = true
+hex.workspace = true
+rand_core.workspace = true
+regex.workspace = true
+shellexpand.workspace = true
+thiserror.workspace = true
+tonic.workspace = true
+borsh.workspace = true
+tracing.workspace = true
+secrecy.workspace = true
+zeroize.workspace = true
+
+[dev-dependencies]
+rstest.workspace = true
+kaswallet-test-helpers.workspace = true

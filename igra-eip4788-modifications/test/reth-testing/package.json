@@ -1,0 +1,23 @@
+{
+  "name": "reth-eip4788-testing",
+  "version": "1.0.0",
+  "description": "Testing setup for EIP-4788 contracts on reth node",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "node scripts/test-contracts.js",
+    "test:run": "./scripts/run-tests.sh",
+    "docker:up": "docker compose -f docker/docker-compose.yml up -d",
+    "docker:down": "docker compose -f docker/docker-compose.yml down",
+    "docker:logs": "docker compose -f docker/docker-compose.yml logs -f",
+    "docker:ps": "docker compose -f docker/docker-compose.yml ps"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "ethers": "^6.13.0",
+    "hardhat": "^2.22.0",
+    "node-fetch": "^2.7.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

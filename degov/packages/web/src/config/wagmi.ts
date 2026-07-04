@@ -1,0 +1,92 @@
+import { getDefaultWallets, getDefaultConfig } from "@rainbow-me/rainbowkit";
+import {
+  talismanWallet,
+  okxWallet,
+  imTokenWallet,
+  trustWallet,
+  safeWallet,
+  subWallet,
+} from "@rainbow-me/rainbowkit/wallets";
+import { QueryClient } from "@tanstack/react-query";
+import { cookieStorage, createStorage, type Storage } from "wagmi";
+import { mainnet } from "wagmi/chains";
+
+import { isKastleBrowser, kastleWallet } from "@/config/kastle-wallet";
+import { createWagmiQueryConfig } from "@/utils/query-config";
+
+import type { Chain } from "@rainbow-me/rainbowkit";
+
+const { wallets } = getDefaultWallets();
+
+export function createQueryClient() {
+  return new QueryClient(createWagmiQueryConfig());
+}
+
+type WagmiConfig = ReturnType<typeof getDefaultConfig>;
+
+const configCache = new Map<string, WagmiConfig>();
+
+function chainFingerprint(chain: Chain) {
+  // Stable, order-defined subset of chain metadata that affects wagmi config
+  return JSON.stringify({
+    id: chain.id,
+    name: chain.name,
+    nativeCurrency: chain.nativeCurrency,
+    rpcUrls: chain.rpcUrls,
+    blockExplorers: chain.blockExplorers,
+    contracts: chain.contracts,
+    testnet: chain.testnet,
+  });
+}
+
+export function createConfig({
+  appName,
+  projectId,
+  chain,
+}: {
+  chain: Chain;
+  appName: string;
+  projectId: string;
+}) {
+  const cacheKey = `${projectId}-${chainFingerprint(chain)}-${isKastleBrowser() ? "kastle" : "default"}`;
+  const cachedConfig = configCache.get(cacheKey);
+  if (cachedConfig) {
+    return cachedConfig;
+  }
+
+  const chains = [chain, mainnet as Chain];
+  const storage: Storage = createStorage({
+    storage: cookieStorage,
+  });
+
+  const kastleOnly = isKastleBrowser();
+  const walletGroups = kastleOnly
+    ? [{ groupName: "Kastle", wallets: [kastleWallet] }]
+    : [
+        ...wallets,
+        {
+          groupName: "More",
+          wallets: [
+            kastleWallet,
+            talismanWallet,
+            subWallet,
+            okxWallet,
+            imTokenWallet,
+            trustWallet,
+            safeWallet,
+          ],
+        },
+      ];
+
+  const config = getDefaultConfig({
+    appName,
+    projectId,
+    chains: chains as unknown as readonly [Chain, ...Chain[]],
+    wallets: walletGroups,
+    ssr: true,
+    storage,
+  });
+
+  configCache.set(cacheKey, config);
+  return config;
+}

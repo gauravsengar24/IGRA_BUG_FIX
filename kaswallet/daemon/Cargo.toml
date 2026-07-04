@@ -1,0 +1,46 @@
+[package]
+name = "kaswallet-daemon"
+rust-version.workspace = true
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+include.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "kaswallet-daemon"
+path = "src/main.rs"
+
+[dependencies]
+kaswallet-common.workspace = true
+kaswallet-proto.workspace = true
+
+kaspa-consensus-core.workspace = true
+kaspa-bip32.workspace = true
+kaspa-grpc-client.workspace = true
+kaspa-rpc-core.workspace = true
+kaspa-txscript.workspace = true
+kaspa-addresses.workspace = true
+kaspa-wallet-core.workspace = true
+
+clap = { workspace = true, features = ["derive", "env"] }
+hex.workspace = true
+itertools.workspace = true
+tonic.workspace = true
+tokio.workspace = true
+console-subscriber.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+tracing-appender.workspace = true
+secrecy.workspace = true
+# Not used directly; pinned to fix transitive dep version conflict in Docker builds (ENG-746)
+wasm-bindgen.workspace = true
+js-sys.workspace = true
+
+[dev-dependencies]
+kaspa-consensus.workspace = true
+kaspa-hashes.workspace = true
+rstest.workspace = true
+tempfile.workspace = true

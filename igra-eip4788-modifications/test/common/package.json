@@ -1,0 +1,17 @@
+{
+  "name": "eip4788-testing-common",
+  "version": "1.0.0",
+  "description": "Common dependencies and configuration for EIP-4788 contract testing",
+  "scripts": {
+    "compile": "hardhat compile"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "ethers": "^6.13.0",
+    "hardhat": "^2.22.0",
+    "node-fetch": "^2.7.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

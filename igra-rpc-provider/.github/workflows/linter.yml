@@ -1,0 +1,60 @@
+name: Format, Lint & Typos
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  merge_group:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTC_WRAPPER: "sccache"
+  SCCACHE_GHA_ENABLED: "false"
+  # Use git CLI for fetching (required for SSH auth with private repos in isolated env)
+  CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+
+jobs:
+  format-lint-typos:
+    runs-on: [self-hosted, igra-rpc-provider]
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      - name: Setup Rust environment
+        run: |
+          CI_CACHE="/tmp/ci-cache/${{ runner.name }}"
+          echo "CARGO_TARGET_DIR=${CI_CACHE}/cargo-target" >> $GITHUB_ENV
+          echo "CARGO_HOME=${CI_CACHE}/cargo-home" >> $GITHUB_ENV
+          echo "RUSTUP_HOME=${CI_CACHE}/rustup" >> $GITHUB_ENV
+          echo "SCCACHE_DIR=${CI_CACHE}/sccache" >> $GITHUB_ENV
+          mkdir -p "${CI_CACHE}/cargo-target" "${CI_CACHE}/cargo-home" "${CI_CACHE}/rustup" "${CI_CACHE}/sccache"
+          echo "${CI_CACHE}/cargo-home/bin" >> $GITHUB_PATH
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Check formatting
+        run: cargo +stable fmt -- --check
+
+      - name: Run clippy
+        run: cargo +stable clippy --all-targets --all-features -- -D warnings
+
+      - name: Install typos
+        run: |
+          export PATH="$CARGO_HOME/bin:$PATH"
+          if ! command -v typos &> /dev/null; then
+            RUSTC_WRAPPER= cargo install typos-cli --locked
+          fi
+
+      - name: Run typos
+        run: typos

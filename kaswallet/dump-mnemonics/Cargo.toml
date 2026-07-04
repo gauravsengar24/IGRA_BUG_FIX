@@ -1,0 +1,19 @@
+[package]
+name = "kaswallet-dump-mnemonics"
+rust-version.workspace = true
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+include.workspace = true
+
+[dependencies]
+kaswallet-common.workspace = true
+
+kaspa-consensus-core.workspace = true
+kaspa-bip32.workspace = true
+
+clap = { workspace = true, features = ["derive"] }
+rpassword.workspace = true
+secrecy.workspace = true
