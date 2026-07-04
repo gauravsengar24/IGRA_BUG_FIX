@@ -742,8 +742,8 @@ This audit was performed on the codebase as of **July 4, 2026**. Findings reflec
 
 This report is intended for internal use by IgraLabs development and security teams. Distribution outside the organization requires written permission.
 
-**Audit Team:** OpenCode Security  
-**Contact:** security@opencode.ai  
+**Audit Team:** OpenSource Security  
+**Contact:** Independent Audit 
 **Report Version:** 1.0  
 **Classification:** CONFIDENTIAL
 
